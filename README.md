@@ -11,4 +11,5 @@ go + opencv pedestrian detection
 1. `git clone git@github.com:Robogera/detect.git`
 1. `cd detect/`
 1. `go mod tidy`
+1. `mkdir bin`
 1. `go build -o bin/detect src/main.go`
