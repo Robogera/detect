@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image"
 	// "image"
 	"image/color"
 	"log/slog"
@@ -18,17 +19,18 @@ import (
 	"github.com/hybridgroup/mjpeg"
 	"github.com/lmittmann/tint"
 	"gocv.io/x/gocv"
-	"gocv.io/x/gocv/cuda"
+	// "gocv.io/x/gocv/cuda"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	file_path            string = "/mnt/c/Users/gera/Downloads/greenscreen.mp4"
-	http_port            uint   = 8080
-	read_timeout_sec     uint   = 60
-	write_timeout_sec    uint   = 60
-	shutdown_timeout_sec uint   = 60
-	stat_period_sec      uint   = 2
+  file_path            string  = "/mnt/c/Users/gera/Downloads/greenscreen.mp4"
+	http_port            uint    = 8080
+	read_timeout_sec     uint    = 20
+	write_timeout_sec    uint    = 20
+	shutdown_timeout_sec uint    = 15
+	stat_period_sec      uint    = 2
+	resize_scale         float64 = 0.33
 )
 
 var (
@@ -61,7 +63,7 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		return video(child_ctx, logger, file_path, output_stream, stats_chan)
+		return video(child_ctx, logger, file_path, resize_scale, output_stream, stats_chan)
 	})
 
 	eg.Go(func() error {
@@ -122,6 +124,7 @@ func video(
 	ctx context.Context,
 	logger *slog.Logger,
 	file_uri string,
+	resize_scale float64,
 	output_stream *mjpeg.Stream,
 	stats chan<- struct{}) error {
 
@@ -137,16 +140,20 @@ func video(
 	img := gocv.NewMat()
 	defer img.Close()
 
+	hog := gocv.NewHOGDescriptor()
+	err = hog.SetSVMDetector(gocv.HOGDefaultPeopleDetector())
+	if err != nil {
+		logger.Error("Can't set SVM detector", "err", err)
+		return err
+	}
+	// hog := cuda.CreateHOG()
+	// hog.SetSVMDetector(hog.GetDefaultPeopleDetector())
 
-	// hog := gocv.NewHOGDescriptor()
-  hog := cuda.CreateHOG()
-	hog.SetSVMDetector(hog.GetDefaultPeopleDetector())
+	// gpumat := cuda.NewGpuMat()
+	// defer gpumat.Close()
 
-  gpumat := cuda.NewGpuMat()
-  defer gpumat.Close()
-
-  gpumat_grey := cuda.NewGpuMat()
-  defer gpumat_grey.Close()
+	// gpumat_grey := cuda.NewGpuMat()
+	// defer gpumat_grey.Close()
 
 	logger.Info("Video loop started")
 	for {
@@ -163,10 +170,20 @@ func video(
 				logger.Error("Empty frame received, skipping", "stream", file_uri)
 				continue
 			}
-      gpumat.Upload(img)
-      cuda.CvtColor(gpumat, &gpumat_grey, gocv.ColorRGBToGray)
-			rectangles := hog.DetectMultiScale(gpumat_grey)
+			// gpumat.Upload(img)
+			// cuda.CvtColor(gpumat, &gpumat_grey, gocv.ColorRGBToGray)
+			// rectangles := hog.DetectMultiScale(gpumat_grey)
+			gocv.CvtColor(img, &img, gocv.ColorRGBToGray)
+			gocv.Resize(img, &img, image.Point{}, resize_scale, resize_scale, gocv.InterpolationLinear)
+      rectangles := hog.DetectMultiScale(img)
+			// rectangles := hog.DetectMultiScaleWithParams(
+			// 	img, 0.1,
+			// 	image.Point{2, 2}, image.Point{32, 32}, 1, 1, true)
 			for _, rectangle := range rectangles {
+				logger.Info(
+					"Rectangle found",
+					"min_x", rectangle.Min.X, "min_y", rectangle.Min.Y,
+					"max_x", rectangle.Max.X, "max_y", rectangle.Max.Y)
 				gocv.Rectangle(&img, rectangle, color.RGBA{0, 255, 0, 255}, 1)
 			}
 			stats <- struct{}{}
