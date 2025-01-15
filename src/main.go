@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image"
 	// "image"
-	"image/color"
+	// "image"
+	// "image/color"
 	"log/slog"
 	"net/http"
 	"os"
@@ -24,16 +24,20 @@ import (
 )
 
 const (
-  file_path            string  = "/mnt/c/Users/gera/Downloads/greenscreen.mp4"
-	http_port            uint    = 8080
-	read_timeout_sec     uint    = 20
-	write_timeout_sec    uint    = 20
-	shutdown_timeout_sec uint    = 15
-	stat_period_sec      uint    = 2
-	resize_scale         float64 = 0.33
+	file_path            string = "/mnt/c/Users/gera/Downloads/padded.mp4"
+	http_port            uint   = 8080
+	read_timeout_sec     uint   = 20
+	write_timeout_sec    uint   = 20
+	shutdown_timeout_sec uint   = 15
+	stat_period_sec      uint   = 2
+	model_path           string = "/mnt/c/Users/gera/Downloads/yolov7/yolov7-tiny_640x640.onnx"
+	// config_path          string = "/mnt/c/Users/gera/dev/python-openvino/yolov8n_openvino_model/yolov8n.xml"
 )
 
 var (
+	ERR_CANT_SET_TARGET      error = errors.New("Can't set target")
+	ERR_CANT_SET_BACKEND     error = errors.New("Can't set backend")
+	ERR_BAD_MODEL            error = errors.New("Can't load model")
 	ERR_BAD_STREAM           error = errors.New("Can't read from stream")
 	ERR_STREAM_ENDED         error = errors.New("Stream ended")
 	ERR_CANCELLED_BY_CONTEXT error = errors.New("Cancelled via context")
@@ -63,7 +67,7 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		return video(child_ctx, logger, file_path, resize_scale, output_stream, stats_chan)
+		return video(child_ctx, logger, file_path, model_path, output_stream, stats_chan)
 	})
 
 	eg.Go(func() error {
@@ -123,19 +127,39 @@ func webserver(
 func video(
 	ctx context.Context,
 	logger *slog.Logger,
-	file_uri string,
-	resize_scale float64,
+	file_path string,
+	model_path string,
 	output_stream *mjpeg.Stream,
 	stats chan<- struct{}) error {
 
-	logger.Info("Opening file", "address", file_uri)
+	logger.Info("Opening file", "address", file_path)
 
-	input_stream, err := gocv.VideoCaptureFile(file_uri)
+	input_stream, err := gocv.VideoCaptureFile(file_path)
 	if err != nil {
-		logger.Error("Can't open stream", "address", file_uri, "err", err)
+		logger.Error("Can't open stream", "address", file_path, "err", err)
 		return ERR_BAD_STREAM
 	}
 	defer input_stream.Close()
+
+	net := gocv.ReadNetFromONNX(model_path)
+	if net.Empty() {
+		logger.Error("Error reading network model")
+		return ERR_BAD_MODEL
+	}
+	defer net.Close()
+
+	outputNames := getOutputNames(&net)
+	if len(outputNames) == 0 {
+		logger.Error("Error reading output layer names")
+		return ERR_BAD_MODEL
+	}
+
+	if err := net.SetPreferableBackend(gocv.NetBackendType(gocv.NetBackendOpenVINO)); err != nil {
+		return ERR_CANT_SET_BACKEND
+	}
+	if err := net.SetPreferableTarget(gocv.NetTargetType(gocv.NetTargetVPU)); err != nil {
+		return ERR_CANT_SET_TARGET
+	}
 
 	img := gocv.NewMat()
 	defer img.Close()
@@ -163,29 +187,14 @@ func video(
 			return ERR_CANCELLED_BY_CONTEXT
 		default:
 			if !input_stream.Read(&img) {
-				logger.Error("Can't read next frame", "stream", file_uri)
+				logger.Error("Can't read next frame", "stream", file_path)
 				return ERR_STREAM_ENDED
 			}
 			if img.Empty() {
-				logger.Error("Empty frame received, skipping", "stream", file_uri)
+				logger.Error("Empty frame received, skipping", "stream", file_path)
 				continue
 			}
-			// gpumat.Upload(img)
-			// cuda.CvtColor(gpumat, &gpumat_grey, gocv.ColorRGBToGray)
-			// rectangles := hog.DetectMultiScale(gpumat_grey)
-			gocv.CvtColor(img, &img, gocv.ColorRGBToGray)
-			gocv.Resize(img, &img, image.Point{}, resize_scale, resize_scale, gocv.InterpolationLinear)
-      rectangles := hog.DetectMultiScale(img)
-			// rectangles := hog.DetectMultiScaleWithParams(
-			// 	img, 0.1,
-			// 	image.Point{2, 2}, image.Point{32, 32}, 1, 1, true)
-			for _, rectangle := range rectangles {
-				logger.Info(
-					"Rectangle found",
-					"min_x", rectangle.Min.X, "min_y", rectangle.Min.Y,
-					"max_x", rectangle.Max.X, "max_y", rectangle.Max.Y)
-				gocv.Rectangle(&img, rectangle, color.RGBA{0, 255, 0, 255}, 1)
-			}
+
 			stats <- struct{}{}
 			buf, err := gocv.IMEncode(".jpg", img)
 			if err != nil {
