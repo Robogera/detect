@@ -53,7 +53,10 @@ func detect(net *gocv.Net, src *gocv.Mat, outputNames []string) {
 		return
 	}
 
+
+  
 	iboxes := params.BlobRectsToImageRects(boxes, image.Pt(src.Cols(), src.Rows()))
+  log.Println(iboxes)
 	indices := gocv.NMSBoxes(iboxes, confidences, scoreThreshold, nmsThreshold)
 	drawRects(src, iboxes, classes, classIds, indices)
 }
@@ -106,8 +109,9 @@ func drawRects(img *gocv.Mat, boxes []image.Rectangle, classes []string, classId
 		if idx == 0 {
 			continue
 		}
-		gocv.Rectangle(img, image.Rect(boxes[idx].Min.X, boxes[idx].Min.Y, boxes[idx].Max.X, boxes[idx].Max.Y), color.RGBA{0, 255, 0, 0}, 2)
-		gocv.PutText(img, classes[classIds[idx]], image.Point{boxes[idx].Min.X, boxes[idx].Min.Y - 10}, gocv.FontHersheyPlain, 0.6, color.RGBA{0, 255, 0, 0}, 1)
+    // log.Println(boxes[idx].Min.X, boxes[idx].Min.Y, boxes[idx].Max.X, boxes[idx].Max.Y)
+		gocv.Rectangle(img, image.Rect(boxes[idx].Min.X, boxes[idx].Min.Y, boxes[idx].Max.X, boxes[idx].Max.Y), color.RGBA{0, 255, 0, 255}, 4)
+		gocv.PutText(img, classes[classIds[idx]], image.Point{boxes[idx].Min.X, boxes[idx].Min.Y - 10}, gocv.FontHersheyPlain, 0.6, color.RGBA{0, 255, 0, 255}, 2)
 		detectClass = append(detectClass, classes[classIds[idx]])
 
 	}
@@ -125,5 +129,5 @@ var classes = []string{
 	"bowl", "banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut",
 	"cake", "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
 	"remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book",
-	"clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush",
+	"clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush", "placeholder",
 }

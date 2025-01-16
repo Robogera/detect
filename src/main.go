@@ -23,14 +23,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// TODO: move this to config file
 const (
 	file_path            string = "/mnt/c/Users/gera/Downloads/padded.mp4"
+  // file_path            string = "/mnt/c/Users/gera/Downloads/greenscreen.mp4"
 	http_port            uint   = 8080
 	read_timeout_sec     uint   = 20
 	write_timeout_sec    uint   = 20
 	shutdown_timeout_sec uint   = 15
 	stat_period_sec      uint   = 2
-	model_path           string = "/mnt/c/Users/gera/Downloads/yolov7/yolov7-tiny_640x640.onnx"
+	// model_path           string = "/mnt/c/Users/gera/Downloads/yolov7/yolov7-tiny_640x640.onnx"
+	model_path          string = "/mnt/c/Users/gera/dev/python-openvino/yolo11n.onnx"
 	// config_path          string = "/mnt/c/Users/gera/dev/python-openvino/yolov8n_openvino_model/yolov8n.xml"
 )
 
@@ -152,32 +155,21 @@ func video(
 	if len(outputNames) == 0 {
 		logger.Error("Error reading output layer names")
 		return ERR_BAD_MODEL
-	}
+	} else {
+    for _, name := range outputNames {
+      logger.Info("Model info", "outputNames", name)
+    }
+  }
 
 	if err := net.SetPreferableBackend(gocv.NetBackendType(gocv.NetBackendOpenVINO)); err != nil {
 		return ERR_CANT_SET_BACKEND
 	}
-	if err := net.SetPreferableTarget(gocv.NetTargetType(gocv.NetTargetVPU)); err != nil {
+	if err := net.SetPreferableTarget(gocv.NetTargetType(gocv.NetTargetCPU)); err != nil {
 		return ERR_CANT_SET_TARGET
 	}
 
 	img := gocv.NewMat()
 	defer img.Close()
-
-	hog := gocv.NewHOGDescriptor()
-	err = hog.SetSVMDetector(gocv.HOGDefaultPeopleDetector())
-	if err != nil {
-		logger.Error("Can't set SVM detector", "err", err)
-		return err
-	}
-	// hog := cuda.CreateHOG()
-	// hog.SetSVMDetector(hog.GetDefaultPeopleDetector())
-
-	// gpumat := cuda.NewGpuMat()
-	// defer gpumat.Close()
-
-	// gpumat_grey := cuda.NewGpuMat()
-	// defer gpumat_grey.Close()
 
 	logger.Info("Video loop started")
 	for {
@@ -194,6 +186,8 @@ func video(
 				logger.Error("Empty frame received, skipping", "stream", file_path)
 				continue
 			}
+
+      detect(&net, &img, outputNames)
 
 			stats <- struct{}{}
 			buf, err := gocv.IMEncode(".jpg", img)
