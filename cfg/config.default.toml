@@ -1,0 +1,23 @@
+### Default config
+[model]
+format = "onnx" # onnx or openvino or caffe
+path = "~/dev/yolov7/yolov7-tiny_640x640.onnx"
+config_path = "/my/config/path.xml" # optional
+
+[backend]
+device = "cpu" # cpu or vpu or gpu
+
+[input]
+type = "file" # file or webcam (WIP: stream)
+path = "~/Videos/padded.mp4" # if type is "file"
+
+[webserver]
+port = 8080
+read_timeout_sec = 120
+write_timeout_sec = 120
+shutdown_timeout_sec = 10
+
+[logging]
+level = "info"
+stat_period_sec = 4 # 0 to disable the periodic stats
+

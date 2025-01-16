@@ -3,11 +3,8 @@ package main
 import (
 	// stdlib
 	"context"
-	"errors"
+	"flag"
 	"fmt"
-	// "image"
-	// "image"
-	// "image/color"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,43 +12,63 @@ import (
 	"syscall"
 	"time"
 
+	// internal
+	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/enums"
+
 	// external
 	"github.com/hybridgroup/mjpeg"
 	"github.com/lmittmann/tint"
 	"gocv.io/x/gocv"
-	// "gocv.io/x/gocv/cuda"
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO: move this to config file
 const (
-	file_path            string = "/mnt/c/Users/gera/Downloads/padded.mp4"
-  // file_path            string = "/mnt/c/Users/gera/Downloads/greenscreen.mp4"
-	http_port            uint   = 8080
-	read_timeout_sec     uint   = 20
-	write_timeout_sec    uint   = 20
-	shutdown_timeout_sec uint   = 15
-	stat_period_sec      uint   = 2
-	// model_path           string = "/mnt/c/Users/gera/Downloads/yolov7/yolov7-tiny_640x640.onnx"
-	model_path          string = "/mnt/c/Users/gera/dev/python-openvino/yolo11n.onnx"
-	// config_path          string = "/mnt/c/Users/gera/dev/python-openvino/yolov8n_openvino_model/yolov8n.xml"
+	default_cfg_path string = "../cfg/config.default.toml"
 )
 
-var (
-	ERR_CANT_SET_TARGET      error = errors.New("Can't set target")
-	ERR_CANT_SET_BACKEND     error = errors.New("Can't set backend")
-	ERR_BAD_MODEL            error = errors.New("Can't load model")
-	ERR_BAD_STREAM           error = errors.New("Can't read from stream")
-	ERR_STREAM_ENDED         error = errors.New("Stream ended")
-	ERR_CANCELLED_BY_CONTEXT error = errors.New("Cancelled via context")
-	ERR_INTERRUPTED_BY_USER  error = errors.New("Interrupted by user")
-)
+var cfg_path string
+
+func init() {
+	flag.StringVar(
+		&cfg_path, "config",
+		default_cfg_path,
+		"Path to config file")
+}
 
 func main() {
+
+	// Configuration init
+
+	flag.Parse()
+
+	cfg, err := config.Unmarshal(cfg_path)
+	if err != nil {
+		slog.Error("Config file not loaded. Shutting down...", "provided path", cfg_path, "error", err)
+		return
+	}
+
+	var log_level slog.Level
+
+	// kill me
+	switch *enums.LoggingLevels.Parse(cfg.Logging.Level) {
+	case enums.LoggingLevelDebug:
+		log_level = slog.LevelDebug
+	case enums.LoggingLevelInfo:
+		log_level = slog.LevelInfo
+	case enums.LoggingLevelWarn:
+		log_level = slog.LevelWarn
+	case enums.LoggingLevelError:
+		log_level = slog.LevelError
+	default:
+		slog.Error("No valid logging level provided. Defaulting to LevelError", "provided value", cfg.Logging.Level)
+		log_level = slog.LevelError
+	}
+
 	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
-		Level:      slog.LevelInfo,
+		Level:      log_level,
 		TimeFormat: time.RFC3339,
-		AddSource:  true,
+		AddSource:  true, // change to false on release version
 	}))
 
 	logger.Info("Starting...")
@@ -65,16 +82,16 @@ func main() {
 
 	eg.Go(func() error {
 		return webserver(
-			child_ctx, logger, output_stream, http_port,
-			read_timeout_sec, write_timeout_sec, shutdown_timeout_sec)
+			child_ctx, logger, output_stream, cfg.Webserver.Port,
+			cfg.Webserver.ReadTimeoutSec, cfg.Webserver.WriteTimeoutSec, cfg.Webserver.ShutdownTimeoutSec)
 	})
 
 	eg.Go(func() error {
-		return video(child_ctx, logger, file_path, model_path, output_stream, stats_chan)
+		return video(child_ctx, logger, cfg.Input.Path, cfg.Model.Path, output_stream, stats_chan)
 	})
 
 	eg.Go(func() error {
-		return stat(child_ctx, logger, stats_chan, stat_period_sec)
+		return stat(child_ctx, logger, stats_chan, cfg.Logging.StatPeriodSec)
 	})
 
 	eg.Go(func() error {
@@ -156,10 +173,10 @@ func video(
 		logger.Error("Error reading output layer names")
 		return ERR_BAD_MODEL
 	} else {
-    for _, name := range outputNames {
-      logger.Info("Model info", "outputNames", name)
-    }
-  }
+		for _, name := range outputNames {
+			logger.Info("Model info", "outputNames", name)
+		}
+	}
 
 	if err := net.SetPreferableBackend(gocv.NetBackendType(gocv.NetBackendOpenVINO)); err != nil {
 		return ERR_CANT_SET_BACKEND
@@ -187,7 +204,7 @@ func video(
 				continue
 			}
 
-      detect(&net, &img, outputNames)
+			detect(&net, &img, outputNames)
 
 			stats <- struct{}{}
 			buf, err := gocv.IMEncode(".jpg", img)
