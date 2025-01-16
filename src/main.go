@@ -15,6 +15,7 @@ import (
 	// internal
 	"github.com/Robogera/detect/pkg/config"
 	"github.com/Robogera/detect/pkg/enums"
+	"github.com/Robogera/detect/pkg/rpath"
 
 	// external
 	"github.com/hybridgroup/mjpeg"
@@ -28,8 +29,18 @@ const (
 )
 
 var cfg_path string
+var exe_dir string
 
 func init() {
+	// I have to this or compiler goes crazy on the next line YIKES!
+	var err error
+
+	exe_dir, err = rpath.ExecutableDir()
+	if err != nil {
+		slog.Error("Can't find the executable's location", "error", err)
+		return
+	}
+
 	flag.StringVar(
 		&cfg_path, "config",
 		default_cfg_path,
@@ -61,7 +72,10 @@ func main() {
 	case enums.LoggingLevelError:
 		log_level = slog.LevelError
 	default:
-		slog.Error("No valid logging level provided. Defaulting to LevelError", "provided value", cfg.Logging.Level)
+		slog.Warn(
+			"No valid logging level provided. Defaulting to LevelError",
+			"provided value", cfg.Logging.Level,
+			"valid values", enums.LoggingLevels.Values())
 		log_level = slog.LevelError
 	}
 
@@ -83,15 +97,23 @@ func main() {
 	eg.Go(func() error {
 		return webserver(
 			child_ctx, logger, output_stream, cfg.Webserver.Port,
-			cfg.Webserver.ReadTimeoutSec, cfg.Webserver.WriteTimeoutSec, cfg.Webserver.ShutdownTimeoutSec)
+			cfg.Webserver.ReadTimeoutSec,
+			cfg.Webserver.WriteTimeoutSec,
+			cfg.Webserver.ShutdownTimeoutSec)
 	})
 
 	eg.Go(func() error {
-		return video(child_ctx, logger, cfg.Input.Path, cfg.Model.Path, output_stream, stats_chan)
+		return video(
+			child_ctx, logger,
+			rpath.Convert(exe_dir, cfg.Input.Path),
+			rpath.Convert(exe_dir, cfg.Model.Path),
+			output_stream, stats_chan)
 	})
 
 	eg.Go(func() error {
-		return stat(child_ctx, logger, stats_chan, cfg.Logging.StatPeriodSec)
+		return stat(
+			child_ctx, logger, stats_chan,
+			cfg.Logging.StatPeriodSec)
 	})
 
 	eg.Go(func() error {
