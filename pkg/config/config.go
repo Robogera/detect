@@ -18,7 +18,7 @@ type ConfigFile struct {
 type ModelConfig struct {
 	Format     string
 	Path       string
-	ConfigPath string
+	ConfigPath string `toml:"config_path"`
 }
 
 type BackendConfig struct {
@@ -32,14 +32,14 @@ type InputConfig struct {
 
 type WebserverConfig struct {
 	Port               uint
-	ReadTimeoutSec     uint
-	WriteTimeoutSec    uint
-	ShutdownTimeoutSec uint
+	ReadTimeoutSec     uint `toml:"read_timeout_sec"`
+	WriteTimeoutSec    uint `toml:"write_timeout_sec"`
+	ShutdownTimeoutSec uint `toml:"shutdown_timeout_sec"`
 }
 
 type LoggingConfig struct {
 	Level         string
-	StatPeriodSec uint
+	StatPeriodSec uint `toml:"stat_period_sec"`
 }
 
 func Unmarshal(file_path string) (*ConfigFile, error) {
