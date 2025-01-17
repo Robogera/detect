@@ -1,7 +1,7 @@
 ### Default config
 [model]
 format = "onnx" # onnx or openvino or caffe
-path = "/home/gera/dev/yolov7/yolov7-tiny_640x640.onnx"
+path = "/my/model/path/yolov7-tiny_640x640.onnx"
 config_path = "/my/config/path.xml" # optional
 
 [backend]
@@ -9,7 +9,7 @@ device = "cpu" # cpu or vpu or gpu
 
 [input]
 type = "file" # file or webcam (WIP: stream)
-path = "/home/gera/Videos/padded.mp4" # if type is "file"
+path = "/my/video/path.mp4" # if type is "file"
 
 [webserver]
 port = 8080

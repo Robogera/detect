@@ -56,7 +56,7 @@ func detect(net *gocv.Net, src *gocv.Mat, outputNames []string) {
 
   
 	iboxes := params.BlobRectsToImageRects(boxes, image.Pt(src.Cols(), src.Rows()))
-  log.Println(iboxes)
+  // log.Println(iboxes)
 	indices := gocv.NMSBoxes(iboxes, confidences, scoreThreshold, nmsThreshold)
 	drawRects(src, iboxes, classes, classIds, indices)
 }
@@ -67,7 +67,7 @@ func performDetection(outs []gocv.Mat) ([]image.Rectangle, []float32, []int) {
 	var boxes []image.Rectangle
 
 	// needed for yolov8
-	gocv.TransposeND(outs[0], []int{0, 2, 1}, &outs[0])
+	// gocv.TransposeND(outs[0], []int{0, 2, 1}, &outs[0])
 
 	for _, out := range outs {
 		out = out.Reshape(1, out.Size()[1])
@@ -91,6 +91,9 @@ func performDetection(outs []gocv.Mat) ([]image.Rectangle, []float32, []int) {
 				bottom := centerY + height/2
 				classIds = append(classIds, classIDPoint.X)
 				confidences = append(confidences, float32(confidence))
+
+        // DEBUG
+        log.Println(int(left), int(top), int(right), int(bottom))
 
 				boxes = append(boxes, image.Rect(int(left), int(top), int(right), int(bottom)))
 

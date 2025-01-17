@@ -4,9 +4,7 @@ import (
 	// stdlib
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,7 +15,6 @@ import (
 	"github.com/Robogera/detect/pkg/rpath"
 
 	// external
-	"github.com/hybridgroup/mjpeg"
 	"github.com/lmittmann/tint"
 	"golang.org/x/sync/errgroup"
 )
@@ -56,6 +53,7 @@ func main() {
 		slog.Error("Config file not loaded. Shutting down...", "provided path", cfg_path, "error", err)
 		return
 	}
+	slog.Info("Config file loaded", "provided path", cfg_path)
 
 	var log_level slog.Level
 
@@ -86,25 +84,15 @@ func main() {
 	ctx := context.Background()
 	eg, child_ctx := errgroup.WithContext(ctx)
 
-  // TODO: try buffering
-  frames_chan := make(chan []byte)
+	// TODO: try buffering
+	frames_chan := make(chan []byte, 8)
 
 	eg.Go(func() error {
-		return webserver(
-			child_ctx, logger, output_stream, cfg.Webserver.Port,
-			cfg.Webserver.ReadTimeoutSec,
-			cfg.Webserver.WriteTimeoutSec,
-			cfg.Webserver.ShutdownTimeoutSec)
+		return webplayer(child_ctx, logger, cfg, frames_chan)
 	})
 
 	eg.Go(func() error {
-		// return video(
-		// 	child_ctx, logger,
-		// 	rpath.Convert(exe_dir, cfg.Input.Path),
-		// 	rpath.Convert(exe_dir, cfg.Model.Path),
-		// 	output_stream, stats_chan)
-    return processor(
-    child_ctx, logger, cfg, frames_chan)
+		return processor(child_ctx, logger, cfg, frames_chan)
 	})
 
 	// eg.Go(func() error {
@@ -119,26 +107,7 @@ func main() {
 
 	eg.Wait()
 
-	logger.Info("Stopped")
-}
-
-func stat(ctx context.Context, logger *slog.Logger, stats <-chan struct{}, stat_period_sec uint) error {
-	var frames uint = 0
-	var frames_since_last_tick uint = 0
-	ticker := time.NewTicker(time.Second * time.Duration(stat_period_sec))
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Stat cancelled by context")
-			return context.Canceled
-		case <-stats:
-			frames++
-			frames_since_last_tick++
-		case <-ticker.C:
-			logger.Info("Stats", "frames processed", frames, "frames per second", frames_since_last_tick/stat_period_sec)
-			frames_since_last_tick = 0
-		}
-	}
+	logger.Info("All subroutines returned")
 }
 
 func control(ctx context.Context, logger *slog.Logger) error {

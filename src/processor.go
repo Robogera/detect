@@ -1,14 +1,14 @@
 package main
 
 import (
-  // stdlib
+	// stdlib
 	"context"
 	"log/slog"
 
-  // internal
+	// internal
 	"github.com/Robogera/detect/pkg/config"
 
-  // external
+	// external
 	"gocv.io/x/gocv"
 )
 
@@ -109,7 +109,11 @@ func processor(
 			}
 			data := make([]byte, buf.Len())
 			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
-      frames_chan <- data
+			select {
+			case frames_chan <- data:
+			default:
+				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(frames_chan))
+			}
 			buf.Close()
 		}
 	}
