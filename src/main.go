@@ -61,15 +61,14 @@ func main() {
 
 	var log_level slog.Level
 
-	// kill me
-	switch *enums.LoggingLevels.Parse(cfg.Logging.Level) {
-	case enums.LoggingLevelDebug:
+	switch config.LoggingLevel(cfg.Logging.Level) {
+	case config.LoggingLevelDebug:
 		log_level = slog.LevelDebug
-	case enums.LoggingLevelInfo:
+	case config.LoggingLevelInfo:
 		log_level = slog.LevelInfo
-	case enums.LoggingLevelWarn:
+	case config.LoggingLevelWarn:
 		log_level = slog.LevelWarn
-	case enums.LoggingLevelError:
+	case config.LoggingLevelError:
 		log_level = slog.LevelError
 	default:
 		slog.Warn(

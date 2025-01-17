@@ -7,6 +7,43 @@ import (
 	"os"
 )
 
+// Enum types
+
+type ModelFormat string
+
+const (
+	ModelFormatONNX     = "onnx"
+	ModelFormatOpenVINO = "openvino"
+	ModelFormatCaffe    = "caffe"
+)
+
+type LoggingLevel string
+
+const (
+	LoggingLevelDebug = "debug"
+	LoggingLevelInfo  = "info"
+	LoggingLevelWarn  = "warn"
+	LoggingLevelError = "error"
+)
+
+type DeviceType string
+
+const (
+	DeviceTypeCPU = "cpu"
+	DeviceTypeVPU = "vpu"
+	DeviceTypeGPU = "gpu"
+)
+
+type InputType string
+
+const (
+	InputTypeFile   = "file"
+	InputTypeWebcam = "webcam"
+	InputTypeIPC    = "ipc"
+)
+
+// Config file structure
+
 type ConfigFile struct {
 	Model     ModelConfig
 	Backend   BackendConfig
