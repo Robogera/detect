@@ -24,13 +24,17 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 	// profile this and maybe don't clone
 	cloned_img := gocv.NewMat()
 	img.ConvertTo(&cloned_img, gocv.MatTypeCV32F) // No idea which format to use
-	blob := gocv.BlobFromImage(
-		cloned_img,
+	blob_conv_params := gocv.NewImageToBlobParams(
 		1.0/cfg.Model.ScaleFactor,
 		image.Pt(int(cfg.Model.X), int(cfg.Model.Y)),
 		gocv.NewScalar(0, 0, 0, 0),
 		true,
-		false)
+		gocv.MatTypeCV32F,
+		gocv.DataLayoutNCHW,
+		gocv.PaddingModeLetterbox,
+		gocv.NewScalar(0, 0, 0, 0),
+	)
+	blob := gocv.BlobFromImageWithParams(cloned_img, blob_conv_params)
 	defer blob.Close()
 
 	net.SetInput(blob, "")
@@ -50,7 +54,7 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 	}
 
 	for _, output := range outputs {
-    output_2d := output.Reshape(1, output.Size()[1])
+		output_2d := output.Reshape(1, output.Size()[1])
 		cols := output_2d.Cols()
 		var boxes []image.Rectangle
 		var confidences []float32
@@ -75,7 +79,9 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 				confidences = append(confidences, confidence)
 			}()
 		}
-    output_2d.Close()
+		output_2d.Close()
+
+    boxes = blob_conv_params.BlobRectsToImageRects(boxes, image.Pt(cloned_img.Cols(), cloned_img.Rows()))
 
 		for _, i := range gocv.NMSBoxes(boxes, confidences, cfg.Model.ConfidenceThreshold, cfg.Model.NMSThreshold) {
 			gocv.Rectangle(&cloned_img, boxes[i], color.RGBA{255, 0, 0, 255}, 1)
