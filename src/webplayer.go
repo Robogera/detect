@@ -18,7 +18,7 @@ import (
 func webplayer(
 	ctx context.Context,
 	logger *slog.Logger,
-	cfg config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
+	cfg *config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
 	frames_chan <-chan []byte,
 ) error {
 

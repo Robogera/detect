@@ -15,7 +15,7 @@ import (
 func processor(
 	ctx context.Context,
 	logger *slog.Logger,
-	cfg config.ConfigFile,
+	cfg *config.ConfigFile,
 	frames_chan chan<- []byte) error {
 
 	var input_stream *gocv.VideoCapture
