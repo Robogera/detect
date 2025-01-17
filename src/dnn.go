@@ -18,7 +18,7 @@ var (
 	nmsThreshold   float32 = 0.4
 )
 
-func getOutputNames(net *gocv.Net) []string {
+func getOutputLayerNames(net *gocv.Net) []string {
 	var outputLayers []string
 	for _, i := range net.GetUnconnectedOutLayers() {
 		layer := net.GetLayer(i)

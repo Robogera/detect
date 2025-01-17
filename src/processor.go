@@ -89,7 +89,7 @@ func processor(
 		select {
 		case <-ctx.Done():
 			logger.Info("Video cancelled by context")
-			return ERR_CANCELLED_BY_CONTEXT
+			return context.Canceled
 		default:
 			if !input_stream.Read(&img) {
 				logger.Error("Can't read next frame. Shutting down...", "stream", cfg.Input.Path)

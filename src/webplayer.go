@@ -69,7 +69,7 @@ func webplayer(
 					"Webserver shutdown: unexpected error",
 					"error", err)
 			}
-			return ERR_CANCELLED_BY_CONTEXT
+			return context.Canceled
 		case err := <-err_chan:
 			logger.Error("Server error", "port", cfg.Webserver.Port, "error", err)
 			return err

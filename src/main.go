@@ -14,7 +14,6 @@ import (
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
-	"github.com/Robogera/detect/pkg/enums"
 	"github.com/Robogera/detect/pkg/rpath"
 
 	// external
@@ -73,8 +72,7 @@ func main() {
 	default:
 		slog.Warn(
 			"No valid logging level provided. Defaulting to LevelError",
-			"provided value", cfg.Logging.Level,
-			"valid values", enums.LoggingLevels.Values())
+			"provided value", cfg.Logging.Level)
 		log_level = slog.LevelError
 	}
 
@@ -158,7 +156,7 @@ func webserver(
 		logger.Info(
 			"Webserver shut down successfully", "shutdown duration (sec)",
 			time.Now().Sub(shutdown_initiated_timestamp).Seconds(), "error", err)
-		return ERR_CANCELLED_BY_CONTEXT
+		return context.Canceled
 	case err := <-err_chan:
 		logger.Error("Server error", "port", port, "error", err)
 		return err
@@ -178,7 +176,7 @@ func video(
 	input_stream, err := gocv.VideoCaptureFile(file_path)
 	if err != nil {
 		logger.Error("Can't open stream", "address", file_path, "err", err)
-		return ERR_BAD_STREAM
+		return ERR_BAD_INPUT
 	}
 	defer input_stream.Close()
 
@@ -189,7 +187,7 @@ func video(
 	}
 	defer net.Close()
 
-	outputNames := getOutputNames(&net)
+	outputNames := getOutputLayerNames(&net)
 	if len(outputNames) == 0 {
 		logger.Error("Error reading output layer names")
 		return ERR_BAD_MODEL
@@ -214,7 +212,7 @@ func video(
 		select {
 		case <-ctx.Done():
 			logger.Info("Video cancelled by context")
-			return ERR_CANCELLED_BY_CONTEXT
+			return context.Canceled
 		default:
 			if !input_stream.Read(&img) {
 				logger.Error("Can't read next frame", "stream", file_path)
@@ -233,6 +231,8 @@ func video(
 				logger.Error("Can't encode frame")
 				return err
 			}
+			data := make([]byte, buf.Len())
+			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
 			output_stream.UpdateJPEG(buf.GetBytes())
 			buf.Close()
 		}
@@ -247,7 +247,7 @@ func stat(ctx context.Context, logger *slog.Logger, stats <-chan struct{}, stat_
 		select {
 		case <-ctx.Done():
 			logger.Info("Stat cancelled by context")
-			return ERR_CANCELLED_BY_CONTEXT
+			return context.Canceled
 		case <-stats:
 			frames++
 			frames_since_last_tick++
@@ -268,7 +268,7 @@ func control(ctx context.Context, logger *slog.Logger) error {
 	select {
 	case <-ctx.Done():
 		logger.Info("Control cancelled by context")
-		return ERR_CANCELLED_BY_CONTEXT
+		return context.Canceled
 	case <-interrupt:
 		logger.Info("Cancelled by user")
 		return ERR_INTERRUPTED_BY_USER
