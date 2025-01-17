@@ -107,7 +107,7 @@ func processor(
 			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
       stat_chan <- Statistics{time.Since(inference_start)}
 
-			buf, err := gocv.IMEncode(".jpg", *boxed_img)
+			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *boxed_img)
 			if err != nil {
 				logger.Error("Can't encode frame")
 				return err
