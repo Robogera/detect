@@ -49,6 +49,7 @@ func processor(
 	defer input_stream.Close()
 
 	var net gocv.Net
+  defer net.Close()
 
 	// TODO: panic and recover when the CGO segfaults maybe?
 	switch config.ModelFormat(cfg.Model.Format) {
@@ -118,6 +119,7 @@ func processor(
 			default:
 				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(frames_chan))
 			}
+      boxed_img.Close()
 			buf.Close()
 		}
 	}
