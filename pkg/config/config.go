@@ -56,6 +56,7 @@ type ModelConfig struct {
 	Format     string
 	Path       string
 	ConfigPath string `toml:"config_path"`
+	Transpose  bool
 }
 
 type BackendConfig struct {

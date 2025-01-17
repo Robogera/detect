@@ -3,6 +3,7 @@
 format = "onnx" # onnx or openvino or caffe
 path = "/my/model/path/yolov7-tiny_640x640.onnx"
 config_path = "/my/config/path.xml" # optional
+transpose = false
 
 [backend]
 device = "cpu" # cpu or vpu or gpu
