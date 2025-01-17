@@ -22,6 +22,8 @@ func webplayer(
 	frames_chan <-chan []byte,
 ) error {
 
+	logger.Info("Initiating webplayer...")
+
 	output_stream := mjpeg.NewStream()
 
 	http.Handle("/", output_stream)
@@ -38,6 +40,8 @@ func webplayer(
 		err_chan <- server.ListenAndServe()
 	}()
 
+	logger.Info("Webplayer started", "port", cfg.Webserver.Port)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -49,9 +53,22 @@ func webplayer(
 			defer cancel()
 			shutdown_initiated_timestamp := time.Now()
 			err := server.Shutdown(shutdown_context)
-			logger.Info(
-				"Webserver shut down successfully", "shutdown duration (sec)",
-				time.Now().Sub(shutdown_initiated_timestamp).Seconds(), "error", err)
+			switch err {
+			case context.Canceled:
+				logger.Error(
+					"Webserver shutdown: timeout",
+					"timeout (sec)", cfg.Webserver.ShutdownTimeoutSec,
+					"error", err)
+			case nil:
+				logger.Info(
+					"Webserver shutdown: success",
+					"shutdown time (sec)", time.Now().Sub(shutdown_initiated_timestamp).Seconds(),
+					"error", err)
+			default:
+				logger.Error(
+					"Webserver shutdown: unexpected error",
+					"error", err)
+			}
 			return ERR_CANCELLED_BY_CONTEXT
 		case err := <-err_chan:
 			logger.Error("Server error", "port", cfg.Webserver.Port, "error", err)
