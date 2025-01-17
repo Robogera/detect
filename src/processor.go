@@ -4,6 +4,7 @@ import (
 	// stdlib
 	"context"
 	"log/slog"
+	"time"
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
@@ -16,7 +17,8 @@ func processor(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile,
-	frames_chan chan<- []byte) error {
+	frames_chan chan<- []byte,
+  stat_chan chan<- Statistics) error {
 
 	var input_stream *gocv.VideoCapture
 	var err error
@@ -100,7 +102,9 @@ func processor(
 				continue
 			}
 
+      inference_start := time.Now()
 			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
+      stat_chan <- Statistics{time.Since(inference_start)}
 
 			buf, err := gocv.IMEncode(".jpg", *boxed_img)
 			if err != nil {

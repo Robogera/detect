@@ -87,19 +87,20 @@ func main() {
 	// TODO: try buffering
 	frames_chan := make(chan []byte, 8)
 
+  stat_chan := make(chan Statistics, 8)
+
 	eg.Go(func() error {
 		return webplayer(child_ctx, logger, cfg, frames_chan)
 	})
 
 	eg.Go(func() error {
-		return processor(child_ctx, logger, cfg, frames_chan)
+		return processor(child_ctx, logger, cfg, frames_chan, stat_chan)
 	})
 
-	// eg.Go(func() error {
-	// 	return stat(
-	// 		child_ctx, logger, stats_chan,
-	// 		cfg.Logging.StatPeriodSec)
-	// })
+	eg.Go(func() error {
+		return stat(
+			child_ctx, logger, cfg, stat_chan)
+	})
 
 	eg.Go(func() error {
 		return control(child_ctx, logger)
