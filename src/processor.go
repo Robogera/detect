@@ -100,9 +100,9 @@ func processor(
 				continue
 			}
 
-			detect(&net, &img, output_layer_names)
+			boxed_img, _, _ := detectObjects(&net, &img, output_layer_names)
 
-			buf, err := gocv.IMEncode(".jpg", img)
+			buf, err := gocv.IMEncode(".jpg", *boxed_img)
 			if err != nil {
 				logger.Error("Can't encode frame")
 				return err
