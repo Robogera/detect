@@ -3,7 +3,13 @@
 format = "onnx" # onnx or openvino or caffe
 path = "/my/model/path/yolov7-tiny_640x640.onnx"
 config_path = "/my/config/path.xml" # optional
-transpose = false
+transpose = false # set true for ultralythics-authored models
+x = 640
+y = 640
+confidence_threshold = 0.995
+nms_threshold = 0.05
+person_class_index = 1 # usually 0 or 1 for most models
+scale_factor = 255.0
 
 [backend]
 device = "cpu" # cpu or vpu or gpu

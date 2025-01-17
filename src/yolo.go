@@ -3,7 +3,6 @@ package main
 import (
 	"image"
 	"image/color"
-	"log"
 
 	"github.com/Robogera/detect/pkg/config"
 	"gocv.io/x/gocv"
@@ -21,13 +20,14 @@ func getOutputLayerNames(net *gocv.Net) []string {
 	return output_layer_names
 }
 
-func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) (*gocv.Mat, []string, error) {
+func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) (*gocv.Mat, error) {
+  // profile this and maybe don't clone
 	cloned_img := img.Clone()
 	img.ConvertTo(&cloned_img, gocv.MatTypeCV32F) // No idea which format to use
 	blob := gocv.BlobFromImage(
 		cloned_img,
-		1/255.0,
-		image.Pt(640, 640),
+		1.0/cfg.Model.ScaleFactor,
+		image.Pt(int(cfg.Model.X), int(cfg.Model.Y)),
 		gocv.NewScalar(0, 0, 0, 0),
 		true,
 		false)
@@ -56,25 +56,27 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 		var confidences []float32
 		for i := 0; i < output.Rows(); i++ {
 			row := output.RowRange(i, i+1)
+      // values at indexes 4:cols are the confidence scores of the
+      // object classes
 			_, confidence, _, class_id := gocv.MinMaxLoc(row.ColRange(4, cols))
-			if confidence > 1.0 {
-				log.Println("nigga please")
-			}
-			if class_id.X != 1 {
+      // drop everything that isn't most likely a person
+			if class_id.X != int(cfg.Model.PersonClassIndex) {
 				continue
 			}
+      // elements 0 and 1 correspond to the bounding box center coordinates
 			x, y := int(row.GetFloatAt(0, 0)), int(row.GetFloatAt(0, 1))
+      // and elements 2 and 3 are the box dimensions 
 			half_w, half_h := int(row.GetFloatAt(0, 2)/2.0), int(row.GetFloatAt(0, 3)/2.0)
 
 			boxes = append(boxes, image.Rect(x-half_w, y-half_h, x+half_w, y+half_h))
 			confidences = append(confidences, confidence)
 		}
 
-		for _, i := range gocv.NMSBoxes(boxes, confidences, 0.995, 0.05) {
-			gocv.Rectangle(&cloned_img, boxes[i], color.RGBA{255, 0, 0, 255}, 3)
+		for _, i := range gocv.NMSBoxes(boxes, confidences, cfg.Model.ConfidenceThreshold, cfg.Model.NMSThreshold) {
+			gocv.Rectangle(&cloned_img, boxes[i], color.RGBA{255, 0, 0, 255}, 1)
 		}
 
 	}
 
-	return &cloned_img, nil, nil
+	return &cloned_img, nil
 }

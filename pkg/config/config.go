@@ -53,10 +53,16 @@ type ConfigFile struct {
 }
 
 type ModelConfig struct {
-	Format     string
-	Path       string
-	ConfigPath string `toml:"config_path"`
-	Transpose  bool
+	Format              string
+	Path                string
+	ConfigPath          string `toml:"config_path"`
+	Transpose           bool
+	ScaleFactor         float64 `toml:"scale_factor"`
+	X                   uint
+	Y                   uint
+	ConfidenceThreshold float32 `toml:"confidence_threshold"`
+	NMSThreshold        float32 `toml:"nms_threshold"`
+	PersonClassIndex    uint    `toml:"person_class_index"`
 }
 
 type BackendConfig struct {

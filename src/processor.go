@@ -100,7 +100,7 @@ func processor(
 				continue
 			}
 
-			boxed_img, _, _ := detectObjects(&net, &img, output_layer_names)
+			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
 
 			buf, err := gocv.IMEncode(".jpg", *boxed_img)
 			if err != nil {
