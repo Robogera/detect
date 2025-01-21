@@ -13,6 +13,7 @@ import (
 	// internal
 	"github.com/Robogera/detect/pkg/config"
 	"github.com/Robogera/detect/pkg/rpath"
+	"gocv.io/x/gocv"
 
 	// external
 	"github.com/lmittmann/tint"
@@ -87,14 +88,22 @@ func main() {
 	// TODO: try buffering
 	frames_chan := make(chan []byte, 8)
 
-  stat_chan := make(chan Statistics, 8)
+	stat_chan := make(chan Statistics, 8)
+
+	mat_chan := make(chan gocv.Mat, 8)
+
+	eg.Go(func() error {
+		return streamreader(child_ctx, logger, cfg, mat_chan)
+	})
+
+	for i := 0; i < int(cfg.Model.Threads); i++ {
+		eg.Go(func() error {
+			return detector(child_ctx, logger, cfg, mat_chan, frames_chan, stat_chan)
+		})
+	}
 
 	eg.Go(func() error {
 		return webplayer(child_ctx, logger, cfg, frames_chan)
-	})
-
-	eg.Go(func() error {
-		return processor(child_ctx, logger, cfg, frames_chan, stat_chan)
 	})
 
 	eg.Go(func() error {

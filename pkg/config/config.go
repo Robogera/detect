@@ -63,6 +63,7 @@ type ModelConfig struct {
 	ConfidenceThreshold float32 `toml:"confidence_threshold"`
 	NMSThreshold        float32 `toml:"nms_threshold"`
 	PersonClassIndex    uint    `toml:"person_class_index"`
+	Threads             uint
 }
 
 type BackendConfig struct {
