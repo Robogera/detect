@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"runtime"
-	"time"
 
 	"github.com/Robogera/detect/pkg/config"
 	"github.com/Robogera/detect/pkg/indexed"
@@ -17,7 +16,6 @@ func detector(
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[gocv.Mat],
 	out_chan chan<- indexed.Indexed[[]byte],
-	stat_chan chan<- Statistics,
 ) error {
 
   // not sure if this helps
@@ -57,11 +55,8 @@ func detector(
 			logger.Info("Detector cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
-			inference_start := time.Now()
 			img := frame.Value()
 			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
-
-			stat_chan <- Statistics{time.Since(inference_start)}
 
 			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *boxed_img)
 			if err != nil {

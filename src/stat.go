@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/gsma"
 )
 
 // WIP
@@ -15,9 +16,10 @@ type Statistics struct {
 
 // TODO: expand, add max_wait_time and sliding average for FPS
 func stat(ctx context.Context, logger *slog.Logger, cfg *config.ConfigFile, stat_chan <-chan Statistics) error {
-	var frames uint = 0
-	var frames_since_last_tick uint = 0
-	var cum_avg float64 = 0.0
+	sma, err := gsma.NewSMA[float64](100)
+	if err != nil {
+		logger.Error("Can't init an SMA accumulator", "error", err)
+	}
 	ticker := time.NewTicker(time.Second * time.Duration(cfg.Logging.StatPeriodSec))
 	for {
 		select {
@@ -25,12 +27,9 @@ func stat(ctx context.Context, logger *slog.Logger, cfg *config.ConfigFile, stat
 			logger.Info("Stat cancelled by context")
 			return context.Canceled
 		case stats := <-stat_chan:
-			cum_avg = (stats.inference_time.Seconds() + float64(frames_since_last_tick)*cum_avg) / (float64(frames_since_last_tick) + 1)
-			frames++
-			frames_since_last_tick++
+			sma.Recalc(stats.inference_time.Seconds())
 		case <-ticker.C:
-			logger.Info("Stats", "frames processed", frames, "average inference time", cum_avg)
-			frames_since_last_tick = 0
+			logger.Info("Stats", "frame time SMA (sec)", sma.Show(), "avg FPS", 1.0/sma.Show())
 		}
 	}
 }

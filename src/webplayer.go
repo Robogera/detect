@@ -21,6 +21,7 @@ func webplayer(
 	logger *slog.Logger,
 	cfg *config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
 	in_chan <-chan indexed.Indexed[[]byte],
+	stat_chan chan<- Statistics,
 ) error {
 
 	logger.Info("Initiating webplayer...")
@@ -42,6 +43,8 @@ func webplayer(
 	}()
 
 	logger.Info("Webplayer started", "port", cfg.Webserver.Port)
+
+	last_frame_timestamp := time.Now()
 
 	for {
 		select {
@@ -76,6 +79,12 @@ func webplayer(
 			return err
 		case frame := <-in_chan:
 			output_stream.UpdateJPEG(frame.Value())
+			select {
+			case stat_chan <- Statistics{time.Since(last_frame_timestamp)}:
+				last_frame_timestamp = time.Now()
+			default:
+				logger.Warn("Statistics channel overfilled")
+			}
 		}
 	}
 }
