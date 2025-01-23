@@ -10,6 +10,7 @@ import (
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/indexed"
 
 	// external
 	"github.com/hybridgroup/mjpeg"
@@ -19,7 +20,7 @@ func webplayer(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
-	frames_chan <-chan []byte,
+	in_chan <-chan indexed.Indexed[[]byte],
 ) error {
 
 	logger.Info("Initiating webplayer...")
@@ -73,8 +74,8 @@ func webplayer(
 		case err := <-err_chan:
 			logger.Error("Server error", "port", cfg.Webserver.Port, "error", err)
 			return err
-		case frame := <-frames_chan:
-			output_stream.UpdateJPEG(frame)
+		case frame := <-in_chan:
+			output_stream.UpdateJPEG(frame.Value())
 		}
 	}
 }

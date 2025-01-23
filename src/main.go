@@ -12,6 +12,7 @@ import (
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/indexed"
 	"github.com/Robogera/detect/pkg/rpath"
 	"gocv.io/x/gocv"
 
@@ -86,11 +87,12 @@ func main() {
 	eg, child_ctx := errgroup.WithContext(ctx)
 
 	// TODO: try buffering
-	frames_chan := make(chan []byte, 8)
+	unsorted_frames_chan := make(chan indexed.Indexed[[]byte], 8)
+	sorted_frames_chan := make(chan indexed.Indexed[[]byte], 8)
 
 	stat_chan := make(chan Statistics, 8)
 
-	mat_chan := make(chan gocv.Mat, 8)
+	mat_chan := make(chan indexed.Indexed[gocv.Mat], 8)
 
 	eg.Go(func() error {
 		return streamreader(child_ctx, logger, cfg, mat_chan)
@@ -98,12 +100,16 @@ func main() {
 
 	for i := 0; i < int(cfg.Model.Threads); i++ {
 		eg.Go(func() error {
-			return detector(child_ctx, logger, cfg, mat_chan, frames_chan, stat_chan)
+			return detector(child_ctx, logger, cfg, mat_chan, unsorted_frames_chan, stat_chan)
 		})
 	}
 
 	eg.Go(func() error {
-		return webplayer(child_ctx, logger, cfg, frames_chan)
+		return sorter(child_ctx, logger, cfg, unsorted_frames_chan, sorted_frames_chan)
+	})
+
+	eg.Go(func() error {
+		return webplayer(child_ctx, logger, cfg, sorted_frames_chan)
 	})
 
 	eg.Go(func() error {

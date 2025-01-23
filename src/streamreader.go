@@ -7,6 +7,7 @@ import (
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/indexed"
 
 	// external
 	"gocv.io/x/gocv"
@@ -16,7 +17,7 @@ func streamreader(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile,
-	mat_chan chan<- gocv.Mat,
+	mat_chan chan<- indexed.Indexed[gocv.Mat],
 ) error {
 
 	var input_stream *gocv.VideoCapture
@@ -47,6 +48,8 @@ func streamreader(
 	}
 	defer input_stream.Close()
 
+	var frame_id uint64 = 0
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -66,9 +69,11 @@ func streamreader(
 			}
 
 			select {
-			case mat_chan <- img:
-			default:
-				logger.Warn("Unprocessed mat channel is full. Droping the frame...", "capacity", len(mat_chan))
+			case <-ctx.Done():
+				logger.Info("Streamreader cancelled by context")
+				return context.Canceled
+			case mat_chan <- indexed.NewIndexed[gocv.Mat](frame_id, img):
+				frame_id++
 			}
 		}
 	}

@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"time"
 
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/indexed"
 	"gocv.io/x/gocv"
 )
 
@@ -13,13 +15,13 @@ func detector(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile,
-	mat_chan <-chan gocv.Mat,
-	frames_chan chan<- []byte,
+	in_chan <-chan indexed.Indexed[gocv.Mat],
+	out_chan chan<- indexed.Indexed[[]byte],
 	stat_chan chan<- Statistics,
 ) error {
 
   // not sure if this helps
-  // runtime.LockOSThread()
+  runtime.LockOSThread()
 
 	var net gocv.Net
 	defer net.Close()
@@ -54,8 +56,9 @@ func detector(
 		case <-ctx.Done():
 			logger.Info("Detector cancelled by context")
 			return context.Canceled
-		case img := <-mat_chan:
+		case frame := <-in_chan:
 			inference_start := time.Now()
+			img := frame.Value()
 			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
 
 			stat_chan <- Statistics{time.Since(inference_start)}
@@ -69,9 +72,9 @@ func detector(
 			data := make([]byte, buf.Len())
 			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
 			select {
-			case frames_chan <- data:
+			case out_chan <- indexed.NewIndexed[[]byte](frame.Id(), data):
 			default:
-				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(frames_chan))
+				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(out_chan))
 			}
 
 			buf.Close()
