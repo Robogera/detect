@@ -34,11 +34,17 @@ type Vector[T any] struct {
 }
 
 func (m Mat[T]) Size(direction Direction) int {
+	size := 0
+	iterate_over := m.masked_cols
 	if direction == Vertical {
-		return len(m.masked_rows)
-	} else {
-		return len(m.masked_cols)
+		iterate_over = m.masked_rows
 	}
+	for _, masked := range iterate_over {
+		if !masked {
+			size++
+		}
+	}
+	return size
 }
 
 // Iterator over the unmasked rows/columns of the
@@ -61,6 +67,25 @@ func (m Mat[T]) Vectors(direction Direction) iter.Seq2[int, Vector[T]] {
 			}
 		}
 	}
+}
+
+// Returns the index-th vector from the left/top
+func (m Mat[T]) Head(direction Direction) (int, Vector[T]) {
+	iterate_over := m.masked_rows
+	if direction == Vertical {
+		iterate_over = m.masked_cols
+	}
+	index := slices.Index(iterate_over, false)
+	var vec Vector[T]
+	if index < 0 {
+		vec = Vector[T]{}
+	} else {
+		vec = Vector[T]{
+			Mat: m, index: index,
+			direction: direction,
+		}
+	}
+	return index, vec
 }
 
 // Returns element of the receiver

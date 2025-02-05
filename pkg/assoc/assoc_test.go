@@ -9,6 +9,40 @@ import (
 	"gocv.io/x/gocv"
 )
 
+func BenchmarkAssoc(b *testing.B) {
+
+	pred := make([]image.Point,0, 4)
+	det := make([]image.Point,0, 8)
+
+	for _ = range 4 {
+		pred = append(pred, image.Pt(
+			rand.IntN(600),
+			rand.IntN(600),
+		))
+	}
+
+	for _, point := range pred {
+		det = append(
+			det,
+			point.Add(image.Pt(
+				rand.IntN(12),
+				rand.IntN(12),
+			)),
+		)
+	}
+
+	for _ = range 4 {
+		det = append(det, image.Pt(
+			rand.IntN(600),
+			rand.IntN(600),
+		))
+	}
+	b.ResetTimer()
+	for range b.N {
+		Associate(pred, det, 600)
+	}
+}
+
 func TestAssoc(t *testing.T) {
 
 	pred := make([]image.Point, 0)
@@ -25,8 +59,8 @@ func TestAssoc(t *testing.T) {
 		det = append(
 			det,
 			point.Add(image.Pt(
-				rand.IntN(20),
-				rand.IntN(20),
+				rand.IntN(12),
+				rand.IntN(12),
 			)),
 		)
 	}
@@ -37,7 +71,7 @@ func TestAssoc(t *testing.T) {
 		))
 	}
 
-	assocs := Associate(pred, det, 100)
+	assocs := Associate(pred, det, 129)
 	for _, assoc := range assocs {
 		t.Log(assoc.Pred, assoc.Det)
 	}

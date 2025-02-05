@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/Robogera/detect/pkg/gmat"
+	"github.com/Robogera/detect/pkg/seq"
 )
 
 type Assoc struct{ Pred, Det int }
@@ -54,26 +55,32 @@ func Associate(predicted_points, detected_points []image.Point, threshold float6
 		}
 	}
 
+	_, assocs = min_sq_dist(distance_mat)
+
 	return assocs
 }
 
-func min_sq_dist1(m *gmat.Mat[float64]) (float64, []Assoc) {
+func min_sq_dist(m *gmat.Mat[float64]) (float64, []Assoc) {
 	current_min := math.MaxFloat64
 	edges := make([]Assoc, 0)
 
-	if m.Size(gmat.Horizontal) < 1 {
-		return 0, edges
+	if m.Size(gmat.Horizontal) == 1 {
+		ind_c, vec := m.Head(gmat.Vertical)
+		ind_r, value := seq.MinInd(vec.All())
+		return value, []Assoc{Assoc{Pred: ind_r, Det: ind_c}}
 	}
-	var leftmost_vec gmat.Vector[float64]
-	leftmost_ind_c := 0
-	for ind_c, vec := range m.Vectors(gmat.Vertical) {
-		leftmost_vec = vec
-		leftmost_ind_c = ind_c
-		break
+
+	if m.Size(gmat.Vertical) == 1 {
+		ind_c, vec := m.Head(gmat.Horizontal)
+		ind_r, value := seq.MinInd(vec.All())
+		return value, []Assoc{Assoc{Pred: ind_r, Det: ind_c}}
 	}
+
+	leftmost_ind_c, leftmost_vec := m.Head(gmat.Vertical)
+
 	for ind_r, value := range leftmost_vec.All() {
-		sub_min, sub_edges := min_sq_dist1(
-			m.Mask(gmat.Vertical, 0).
+		sub_min, sub_edges := min_sq_dist(
+			m.Mask(gmat.Vertical, leftmost_ind_c).
 				Mask(gmat.Horizontal, ind_r))
 		if new_min := value + sub_min; new_min < current_min {
 			current_min = new_min
