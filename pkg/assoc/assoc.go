@@ -8,13 +8,10 @@ import (
 	"github.com/Robogera/detect/pkg/seq"
 )
 
-type Assoc struct{ Pred, Det int }
-
-func Associate(predicted_points, detected_points []image.Point, threshold float64) []Assoc {
-	var assocs []Assoc
+func Associate(predicted_points, detected_points []image.Point, threshold float64) (associated_points map[int]int, lost_points []int, new_points []int) {
 
 	if len(detected_points) < 1 || len(predicted_points) < 1 {
-		return assocs
+		return associated_points, nil, nil
 	}
 
 	rows, cols := len(predicted_points), len(detected_points)
@@ -55,25 +52,51 @@ func Associate(predicted_points, detected_points []image.Point, threshold float6
 		}
 	}
 
-	_, assocs = min_sq_dist(distance_mat)
+	_, associated_points = min_sq_dist(distance_mat)
 
-	return assocs
+	associated_pred_points := make([]bool, len(predicted_points))
+	associated_det_points := make([]bool, len(detected_points))
+
+	for pred, det := range associated_points {
+		associated_det_points[det] = true
+		associated_pred_points[pred] = true
+	}
+
+	for i, _ := range detected_points {
+		if !associated_det_points[i] {
+			new_points = append(new_points, i)
+		}
+	}
+
+	for i, _ := range predicted_points {
+		if !associated_pred_points[i] {
+			lost_points = append(lost_points, i)
+		}
+	}
+
+	return associated_points, lost_points, new_points
 }
 
-func min_sq_dist(m *gmat.Mat[float64]) (float64, []Assoc) {
+func min_sq_dist(m *gmat.Mat[float64]) (float64, map[int]int) {
 	current_min := math.MaxFloat64
-	edges := make([]Assoc, 0)
+	edges := make(map[int]int, 0)
+
+	if m.Size(gmat.Vertical) < 1 || m.Size(gmat.Horizontal) < 1 {
+		return 0, edges
+	}
 
 	if m.Size(gmat.Horizontal) == 1 {
 		ind_c, vec := m.Head(gmat.Vertical)
 		ind_r, value := seq.MinInd(vec.All())
-		return value, []Assoc{Assoc{Pred: ind_r, Det: ind_c}}
+		edges[ind_r] = ind_c
+		return value, edges
 	}
 
 	if m.Size(gmat.Vertical) == 1 {
 		ind_c, vec := m.Head(gmat.Horizontal)
 		ind_r, value := seq.MinInd(vec.All())
-		return value, []Assoc{Assoc{Pred: ind_r, Det: ind_c}}
+		edges[ind_r] = ind_c
+		return value, edges
 	}
 
 	leftmost_ind_c, leftmost_vec := m.Head(gmat.Vertical)
@@ -84,7 +107,8 @@ func min_sq_dist(m *gmat.Mat[float64]) (float64, []Assoc) {
 				Mask(gmat.Horizontal, ind_r))
 		if new_min := value + sub_min; new_min < current_min {
 			current_min = new_min
-			edges = append(sub_edges, Assoc{Pred: ind_r, Det: leftmost_ind_c})
+			edges = sub_edges
+			edges[ind_r] = leftmost_ind_c
 		}
 	}
 	return current_min, edges

@@ -68,3 +68,11 @@ func MinInd[I any, T cmp.Ordered](it iter.Seq2[I, T]) (I, T) {
 	}
 	return current_min_ind, current_min
 }
+
+func SMap[I any, T any](s []T, f func(T, int) I) []I {
+	ss := make([]I, 0)
+	for i, v := range s {
+		ss = append(ss, f(v, i))
+	}
+	return ss
+}

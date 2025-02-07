@@ -87,8 +87,9 @@ func main() {
 	eg, child_ctx := errgroup.WithContext(ctx)
 
 	// TODO: try buffering
-	unsorted_frames_chan := make(chan indexed.Indexed[[]byte], 8)
-	sorted_frames_chan := make(chan indexed.Indexed[[]byte], 8)
+	unsorted_frames_chan := make(chan indexed.Indexed[ProcessedFrame], 8)
+	sorted_frames_chan := make(chan indexed.Indexed[ProcessedFrame], 8)
+	sorted_jpeg_chan := make(chan indexed.Indexed[[]byte], 8)
 
 	stat_chan := make(chan Statistics, 8)
 
@@ -109,7 +110,11 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		return webplayer(child_ctx, logger, cfg, sorted_frames_chan, stat_chan)
+		return tracker(child_ctx, logger, cfg, sorted_frames_chan, sorted_jpeg_chan)
+	})
+
+	eg.Go(func() error {
+		return webplayer(child_ctx, logger, cfg, sorted_jpeg_chan, stat_chan)
 	})
 
 	eg.Go(func() error {

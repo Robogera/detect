@@ -72,7 +72,7 @@ func streamreader(
 			case <-ctx.Done():
 				logger.Info("Streamreader cancelled by context")
 				return context.Canceled
-			case mat_chan <- indexed.NewIndexed[gocv.Mat](frame_id, img):
+			case mat_chan <- indexed.NewIndexed(frame_id, img):
 				frame_id++
 			}
 		}

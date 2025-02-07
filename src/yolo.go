@@ -2,7 +2,6 @@ package main
 
 import (
 	"image"
-	"image/color"
 
 	"github.com/Robogera/detect/pkg/config"
 	"gocv.io/x/gocv"
@@ -20,9 +19,10 @@ func getOutputLayerNames(net *gocv.Net) []string {
 	return output_layer_names
 }
 
-func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) (*gocv.Mat, error) {
+func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) ([]image.Rectangle, error) {
 	// profile this and maybe don't clone
 	cloned_img := gocv.NewMat()
+	defer cloned_img.Close()
 	img.ConvertTo(&cloned_img, gocv.MatTypeCV32F) // No idea which format to use
 	blob_conv_params := gocv.NewImageToBlobParams(
 		1.0/cfg.Model.ScaleFactor,
@@ -53,6 +53,8 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 		gocv.TransposeND(outputs[0], []int{0, 2, 1}, &outputs[0])
 	}
 
+	var nms_boxes []image.Rectangle
+
 	for _, output := range outputs {
 		output_2d := output.Reshape(1, output.Size()[1])
 		cols := output_2d.Cols()
@@ -81,13 +83,15 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 		}
 		output_2d.Close()
 
-    boxes = blob_conv_params.BlobRectsToImageRects(boxes, image.Pt(cloned_img.Cols(), cloned_img.Rows()))
+		boxes = blob_conv_params.BlobRectsToImageRects(boxes, image.Pt(cloned_img.Cols(), cloned_img.Rows()))
 
-		for _, i := range gocv.NMSBoxes(boxes, confidences, cfg.Model.ConfidenceThreshold, cfg.Model.NMSThreshold) {
-			gocv.Rectangle(&cloned_img, boxes[i], color.RGBA{255, 0, 0, 255}, 1)
+		indices := gocv.NMSBoxes(boxes, confidences, cfg.Model.ConfidenceThreshold, cfg.Model.NMSThreshold)
+
+		nms_boxes = make([]image.Rectangle, len(indices))
+		for i, j := range indices {
+			nms_boxes[i] = boxes[j]
 		}
-
 	}
 
-	return &cloned_img, nil
+	return nms_boxes, nil
 }

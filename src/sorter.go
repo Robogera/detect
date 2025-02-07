@@ -12,10 +12,10 @@ import (
 
 func sorter(
 	ctx context.Context, logger *slog.Logger, cfg *config.ConfigFile,
-	unsorted_frames_chan <-chan indexed.Indexed[[]byte],
-	sorted_frames_chan chan<- indexed.Indexed[[]byte]) error {
+	unsorted_frames_chan <-chan indexed.Indexed[ProcessedFrame],
+	sorted_frames_chan chan<- indexed.Indexed[ProcessedFrame]) error {
 
-	queue := gheap.Heap[indexed.Indexed[[]byte]]{}
+	queue := gheap.Heap[indexed.Indexed[ProcessedFrame]]{}
 	queue.Init()
 
 	// TODO: move to config

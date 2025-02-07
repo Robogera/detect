@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"image"
 	"log/slog"
 	"runtime"
 
@@ -10,16 +11,21 @@ import (
 	"gocv.io/x/gocv"
 )
 
+type ProcessedFrame struct {
+	Mat   *gocv.Mat
+	Boxes []image.Rectangle
+}
+
 func detector(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[gocv.Mat],
-	out_chan chan<- indexed.Indexed[[]byte],
+	out_chan chan<- indexed.Indexed[ProcessedFrame],
 ) error {
 
-  // not sure if this helps
-  runtime.LockOSThread()
+	// not sure if this helps
+	runtime.LockOSThread()
 
 	var net gocv.Net
 	defer net.Close()
@@ -56,25 +62,18 @@ func detector(
 			return context.Canceled
 		case frame := <-in_chan:
 			img := frame.Value()
-			boxed_img, _ := detectObjects(&net, &img, cfg, output_layer_names)
+			boxes, _ := detectObjects(&net, &img, cfg, output_layer_names)
 
-			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *boxed_img)
-			if err != nil {
-				logger.Error("Can't encode frame")
-				return err
-			}
-
-			data := make([]byte, buf.Len())
-			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
 			select {
-			case out_chan <- indexed.NewIndexed[[]byte](frame.Id(), data):
+			case out_chan <- indexed.NewIndexed[ProcessedFrame](frame.Id(), frame.Time(), ProcessedFrame{
+				Mat: &img,
+				Boxes: boxes,
+			}):
 			default:
 				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(out_chan))
 			}
 
-			buf.Close()
 			img.Close()
-			boxed_img.Close()
 		}
 	}
 }
