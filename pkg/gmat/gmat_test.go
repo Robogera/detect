@@ -50,12 +50,25 @@ func TestMap(t *testing.T) {
 	t.Log("\n" + mapped.String())
 }
 
-func TestMask(t *testing.T) {
+func TestFSU(t *testing.T) {
+	m := coolMatrix(7,14,10)
+	t.Logf("matrix:\n%s\n", m)
+	for ind_c, vec := range m.Vectors(Vertical) {
+		t.Logf("Ind R: %d, vec: %s", ind_c, vec)
+		vec.Set(2, 999)
+	}
+	for ind_r, vec := range m.Vectors(Horizontal) {
+		t.Logf("Ind R: %d, vec: %s", ind_r, vec)
+		vec.Set(2, 999)
+	}
+	t.Logf("matrix:\n%s\n", m)
+}
+
+func Test2d(t *testing.T) {
 	m := coolMatrix(10, 10, 100)
-	m2 := m.
-		Mask(Vertical, 0, 1, 2).
-		Mask(Horizontal, 0, 1, 2).
-		Mask(Horizontal, 9, 8, 7)
-	t.Log("m1:\n" + m.String())
-	t.Log("m2:\n" + m2.String())
+	t.Logf("matrix:\n%s\n", m)
+	s := m.To2d()
+	t.Logf("slice:\n%v\n", s)
+	m.Set(2,2,100)
+	t.Logf("slice:\n%v\n", s)
 }

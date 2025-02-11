@@ -1,4 +1,4 @@
-package main
+package yolo
 
 import (
 	"image"
@@ -7,26 +7,14 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func getOutputLayerNames(net *gocv.Net) []string {
-	var output_layer_names []string
-	for _, i := range net.GetUnconnectedOutLayers() {
-		layer := net.GetLayer(i)
-		name := layer.GetName()
-		if name != "_input" {
-			output_layer_names = append(output_layer_names, name)
-		}
-	}
-	return output_layer_names
-}
-
-func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) ([]image.Rectangle, error) {
+func Detect(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) ([]image.Rectangle, error) {
 	// profile this and maybe don't clone
 	cloned_img := gocv.NewMat()
 	defer cloned_img.Close()
 	img.ConvertTo(&cloned_img, gocv.MatTypeCV32F) // No idea which format to use
 	blob_conv_params := gocv.NewImageToBlobParams(
-		1.0/cfg.Model.ScaleFactor,
-		image.Pt(int(cfg.Model.X), int(cfg.Model.Y)),
+		1.0/cfg.Yolo.ScaleFactor,
+		image.Pt(int(cfg.Yolo.X), int(cfg.Yolo.Y)),
 		gocv.NewScalar(0, 0, 0, 0),
 		true,
 		gocv.MatTypeCV32F,
@@ -49,7 +37,7 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 	// YOLO-models authored by ultralythics are transposed for some reason
 	// this is required to unfuck them
 	// (seems to be in place and zero performance cost so ok)
-	if cfg.Model.Transpose {
+	if cfg.Yolo.Transpose {
 		gocv.TransposeND(outputs[0], []int{0, 2, 1}, &outputs[0])
 	}
 
@@ -70,7 +58,7 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 				defer confidence_scores_area.Close()
 				_, confidence, _, class_id := gocv.MinMaxLoc(confidence_scores_area)
 				// drop everything that isn't most likely a person
-				if class_id.X != int(cfg.Model.PersonClassIndex) {
+				if class_id.X != int(cfg.Yolo.PersonClassIndex) {
 					return
 				}
 				// elements 0 and 1 correspond to the bounding box center coordinates
@@ -85,7 +73,7 @@ func detectObjects(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_
 
 		boxes = blob_conv_params.BlobRectsToImageRects(boxes, image.Pt(cloned_img.Cols(), cloned_img.Rows()))
 
-		indices := gocv.NMSBoxes(boxes, confidences, cfg.Model.ConfidenceThreshold, cfg.Model.NMSThreshold)
+		indices := gocv.NMSBoxes(boxes, confidences, cfg.Yolo.ConfidenceThreshold, cfg.Yolo.NMSThreshold)
 
 		nms_boxes = make([]image.Rectangle, len(indices))
 		for i, j := range indices {

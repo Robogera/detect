@@ -4,6 +4,7 @@ import (
 	// stdlib
 	"context"
 	"log/slog"
+	"time"
 
 	// internal
 	"github.com/Robogera/detect/pkg/config"
@@ -72,7 +73,7 @@ func streamreader(
 			case <-ctx.Done():
 				logger.Info("Streamreader cancelled by context")
 				return context.Canceled
-			case mat_chan <- indexed.NewIndexed(frame_id, img):
+			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), img):
 				frame_id++
 			}
 		}

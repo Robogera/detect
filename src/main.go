@@ -89,7 +89,7 @@ func main() {
 	// TODO: try buffering
 	unsorted_frames_chan := make(chan indexed.Indexed[ProcessedFrame], 8)
 	sorted_frames_chan := make(chan indexed.Indexed[ProcessedFrame], 8)
-	sorted_jpeg_chan := make(chan indexed.Indexed[[]byte], 8)
+	ident_frames_chan := make(chan indexed.Indexed[ProcessedFrame], 8)
 
 	stat_chan := make(chan Statistics, 8)
 
@@ -99,7 +99,7 @@ func main() {
 		return streamreader(child_ctx, logger, cfg, mat_chan)
 	})
 
-	for i := 0; i < int(cfg.Model.Threads); i++ {
+	for i := 0; i < int(cfg.Yolo.Threads); i++ {
 		eg.Go(func() error {
 			return detector(child_ctx, logger, cfg, mat_chan, unsorted_frames_chan)
 		})
@@ -110,11 +110,11 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		return tracker(child_ctx, logger, cfg, sorted_frames_chan, sorted_jpeg_chan)
+		return reidentificator(child_ctx, logger, cfg, sorted_frames_chan, ident_frames_chan)
 	})
 
 	eg.Go(func() error {
-		return webplayer(child_ctx, logger, cfg, sorted_jpeg_chan, stat_chan)
+		return webplayer(child_ctx, logger, cfg, ident_frames_chan, stat_chan)
 	})
 
 	eg.Go(func() error {

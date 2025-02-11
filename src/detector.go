@@ -7,6 +7,8 @@ import (
 	"runtime"
 
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/yolo"
+	gocvcommon "github.com/Robogera/detect/pkg/gocv-common"
 	"github.com/Robogera/detect/pkg/indexed"
 	"gocv.io/x/gocv"
 )
@@ -31,15 +33,15 @@ func detector(
 	defer net.Close()
 
 	// TODO: panic and recover when the CGO segfaults maybe?
-	switch config.ModelFormat(cfg.Model.Format) {
+	switch config.ModelFormat(cfg.Yolo.Format) {
 	case config.ModelFormatCaffe:
 		// TODO: test
-		net = gocv.ReadNetFromCaffe(cfg.Model.ConfigPath, cfg.Model.Path)
+		net = gocv.ReadNetFromCaffe(cfg.Yolo.ConfigPath, cfg.Yolo.Path)
 	case config.ModelFormatONNX:
-		net = gocv.ReadNetFromONNX(cfg.Model.Path)
+		net = gocv.ReadNetFromONNX(cfg.Yolo.Path)
 	case config.ModelFormatOpenVINO:
 		// TODO: test
-		net = gocv.ReadNet(cfg.Model.Path, cfg.Model.ConfigPath)
+		net = gocv.ReadNet(cfg.Yolo.Path, cfg.Yolo.ConfigPath)
 	}
 
 	if net.Empty() {
@@ -48,12 +50,12 @@ func detector(
 	}
 	defer net.Close()
 
-	output_layer_names := getOutputLayerNames(&net)
+	output_layer_names := gocvcommon.GetOutputLayerNames(&net)
 	if len(output_layer_names) == 0 {
-		logger.Error("Can't read output layer name", "model", cfg.Model.Path)
+		logger.Error("Can't read output layer name", "model", cfg.Yolo.Path)
 		return ERR_BAD_MODEL
 	}
-	logger.Debug("Model info", "model", cfg.Model.Path, "output layers", output_layer_names)
+	logger.Debug("Model info", "model", cfg.Yolo.Path, "output layers", output_layer_names)
 
 	for {
 		select {
@@ -62,18 +64,19 @@ func detector(
 			return context.Canceled
 		case frame := <-in_chan:
 			img := frame.Value()
-			boxes, _ := detectObjects(&net, &img, cfg, output_layer_names)
+			boxes, _ := yolo.Detect(&net, &img, cfg, output_layer_names)
 
 			select {
-			case out_chan <- indexed.NewIndexed[ProcessedFrame](frame.Id(), frame.Time(), ProcessedFrame{
+			case out_chan <- indexed.NewIndexed(frame.Id(), frame.Time(), ProcessedFrame{
 				Mat: &img,
 				Boxes: boxes,
 			}):
-			default:
-				logger.Warn("Frame channel full. Droping the frame...", "capacity", len(out_chan))
+			case <-ctx.Done():
+				logger.Info("Streamreader cancelled by context")
+				return context.Canceled
 			}
 
-			img.Close()
+			// img.Close()
 		}
 	}
 }

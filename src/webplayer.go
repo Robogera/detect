@@ -11,6 +11,7 @@ import (
 	// internal
 	"github.com/Robogera/detect/pkg/config"
 	"github.com/Robogera/detect/pkg/indexed"
+	"gocv.io/x/gocv"
 
 	// external
 	"github.com/hybridgroup/mjpeg"
@@ -20,7 +21,7 @@ func webplayer(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
-	in_chan <-chan indexed.Indexed[[]byte],
+	in_chan <-chan indexed.Indexed[ProcessedFrame],
 	stat_chan chan<- Statistics,
 ) error {
 
@@ -78,12 +79,22 @@ func webplayer(
 			logger.Error("Server error", "port", cfg.Webserver.Port, "error", err)
 			return err
 		case frame := <-in_chan:
-			output_stream.UpdateJPEG(frame.Value())
+			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *frame.Value().Mat)
+			if err != nil {
+				logger.Error("Can't encode frame")
+				return err
+			}
+			data := make([]byte, buf.Len())
+			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
+			output_stream.UpdateJPEG(data)
+			buf.Close()
+			frame.Value().Mat.Close()
 			select {
 			case stat_chan <- Statistics{time.Since(last_frame_timestamp)}:
 				last_frame_timestamp = time.Now()
-			default:
-				logger.Warn("Statistics channel overfilled")
+			case <-ctx.Done():
+				logger.Info("Streamreader cancelled by context")
+				return context.Canceled
 			}
 		}
 	}

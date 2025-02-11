@@ -36,7 +36,7 @@ func Seq[T Int | Uint | Float](floor, ceiling, delta T) []T {
 func SeqN[T Int | Uint](n T) []T {
 	seq := make([]T, 0, int(n))
 	var index T = 0
-	for _ = range cap(seq) {
+	for range cap(seq) {
 		seq = append(seq, index)
 		index++
 	}
@@ -51,6 +51,7 @@ func MaxInd[I any, T cmp.Ordered](it iter.Seq2[I, T]) (I, T) {
 		if !set || v > current_max {
 			current_max_ind = i
 			current_max = v
+			set = true
 		}
 	}
 	return current_max_ind, current_max
@@ -64,6 +65,7 @@ func MinInd[I any, T cmp.Ordered](it iter.Seq2[I, T]) (I, T) {
 		if !set || v < current_min {
 			current_min_ind = i
 			current_min = v
+			set = true
 		}
 	}
 	return current_min_ind, current_min
@@ -75,4 +77,24 @@ func SMap[I any, T any](s []T, f func(T, int) I) []I {
 		ss = append(ss, f(v, i))
 	}
 	return ss
+}
+
+func CosSim[T Float](a, b []T) T {
+	if len(a) != len(b) {
+		return 0
+	}
+	var sum_a, sum_b, sum_mul T
+	for i := range len(a) {
+		sum_mul += a[i] * b[i]
+		sum_a += a[i] * a[i]
+		sum_b += b[i] * b[i]
+	}
+	return sum_mul / sum_a / sum_b
+}
+
+func Sum[T cmp.Ordered](s []T) (sum T) {
+	for _, v := range s {
+		sum += v
+	}
+	return
 }

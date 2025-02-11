@@ -1,13 +1,15 @@
 package gmat
 
 import (
+	"errors"
 	"fmt"
 	"iter"
-	"slices"
 	"strings"
 	"text/tabwriter"
+)
 
-	"gonum.org/v1/gonum/mat"
+var (
+	ERR_OOB = errors.New("Index out of bounds")
 )
 
 type Direction bool
@@ -20,9 +22,8 @@ const (
 // Matrix with the ability to quickly
 // delete (mask) rows or columns
 type Mat[T any] struct {
-	s                        []T
-	masked_rows, masked_cols []bool
-	stride                   int
+	s      []T
+	stride int
 }
 
 // Vector backed by the data of the
@@ -33,32 +34,28 @@ type Vector[T any] struct {
 	direction Direction
 }
 
+func (m Mat[T]) At(r, c int) T {
+	return m.s[r*m.stride+c]
+}
+
 func (m Mat[T]) Size(direction Direction) int {
-	size := 0
-	iterate_over := m.masked_cols
 	if direction == Vertical {
-		iterate_over = m.masked_rows
+		return len(m.s) / m.stride
 	}
-	for _, masked := range iterate_over {
-		if !masked {
-			size++
-		}
-	}
-	return size
+	return m.stride
 }
 
 // Iterator over the unmasked rows/columns of the
 // reciever as vectors
 func (m Mat[T]) Vectors(direction Direction) iter.Seq2[int, Vector[T]] {
 	return func(yield func(int, Vector[T]) bool) {
-		iterate_over := m.masked_rows
-		if direction == Vertical {
-			iterate_over = m.masked_cols
+		iterate_over := m.stride
+		if iterate_over < 1 {
+			iterate_over = 0
+		} else if direction == Horizontal {
+			iterate_over = len(m.s) / m.stride
 		}
-		for ind, masked := range iterate_over {
-			if masked {
-				continue
-			}
+		for ind := range iterate_over {
 			if !yield(ind, Vector[T]{
 				Mat: m, index: ind,
 				direction: direction,
@@ -69,46 +66,42 @@ func (m Mat[T]) Vectors(direction Direction) iter.Seq2[int, Vector[T]] {
 	}
 }
 
-// Returns the index-th vector from the left/top
-func (m Mat[T]) Head(direction Direction) (int, Vector[T]) {
-	iterate_over := m.masked_rows
-	if direction == Vertical {
-		iterate_over = m.masked_cols
+func (m Mat[T]) Vector(direction Direction, index int) (Vector[T], error) {
+	if (direction == Horizontal && index >= len(m.s)/m.stride) || (direction == Vertical && index >= m.stride) {
+		return Vector[T]{}, ERR_OOB
 	}
-	index := slices.Index(iterate_over, false)
-	var vec Vector[T]
-	if index < 0 {
-		vec = Vector[T]{}
-	} else {
-		vec = Vector[T]{
-			Mat: m, index: index,
-			direction: direction,
-		}
-	}
-	return index, vec
+	return Vector[T]{
+		Mat: m, index: index,
+		direction: direction,
+	}, nil
 }
 
 // Returns element of the receiver
 // at index
 func (v Vector[T]) At(index int) T {
-	if v.direction {
+	if v.direction == Vertical {
 		return v.Mat.s[v.Mat.stride*index+v.index]
 	} else {
 		return v.Mat.s[v.Mat.stride*v.index+index]
 	}
 }
 
+func (v *Vector[T]) Set(index int, value T) {
+	if v.direction == Vertical {
+		v.Mat.s[v.Mat.stride*index+v.index] = value
+	} else {
+		v.Mat.s[v.Mat.stride*v.index+index] = value
+	}
+}
+
 // Iterate over the unmasked values of vector
 func (v Vector[T]) All() iter.Seq2[int, T] {
 	return func(yield func(int, T) bool) {
-		iterate_over := v.Mat.masked_cols
-		if v.direction {
-			iterate_over = v.Mat.masked_rows
+		iterate_over := v.Mat.stride
+		if v.direction == Vertical {
+			iterate_over = len(v.Mat.s) / v.Mat.stride
 		}
-		for ind, masked := range iterate_over {
-			if masked {
-				continue
-			}
+		for ind := range iterate_over {
 			if !yield(ind, v.At(ind)) {
 				return
 			}
@@ -119,42 +112,17 @@ func (v Vector[T]) All() iter.Seq2[int, T] {
 // Returns a new matrix with pre-allocated
 // backing slice
 func NewMat[T any](r, c int) *Mat[T] {
-	masked_rows := make([]bool, r)
-	masked_cols := make([]bool, c)
 	return &Mat[T]{
-		s:           make([]T, r*c),
-		masked_rows: masked_rows,
-		masked_cols: masked_cols,
-		stride:      c,
+		s:      make([]T, r*c),
+		stride: c,
 	}
-}
-
-// Returns a new matrix by mapping a mat.Dense with a provided function f
-func NewMatFromDense[T any](m *mat.Dense, f func(float64) T) *Mat[T] {
-	r, c := m.Dims()
-	masked_rows := make([]bool, r)
-	masked_cols := make([]bool, c)
-	new_mat := &Mat[T]{
-		s:           make([]T, r*c),
-		masked_rows: masked_rows,
-		masked_cols: masked_cols,
-		stride:      c,
-	}
-	for ind_r := range r {
-		for ind_c := range c {
-			new_mat.Set(ind_r, ind_c, f(m.At(ind_r, ind_c)))
-		}
-	}
-	return new_mat
 }
 
 // Maps an existing matrix into a new one via f
 func Map[T, E any](m *Mat[T], f func(e T, r, c int) E) *Mat[E] {
 	new_mat := &Mat[E]{
-		s:           make([]E, len(m.masked_cols)*len(m.masked_rows)),
-		masked_rows: slices.Clone(m.masked_rows),
-		masked_cols: slices.Clone(m.masked_cols),
-		stride:      m.stride,
+		s:      make([]E, len(m.s)),
+		stride: m.stride,
 	}
 	for ind_r, vec := range m.Vectors(false) {
 		for ind_c, value := range vec.All() {
@@ -166,30 +134,11 @@ func Map[T, E any](m *Mat[T], f func(e T, r, c int) E) *Mat[E] {
 
 // Set the value of element (r, c) in matrix m
 func (m *Mat[T]) Set(r, c int, v T) error {
-	if r >= len(m.masked_rows) || c >= len(m.masked_cols) {
-		return fmt.Errorf("Out of bounds")
+	if r >= len(m.s)/m.stride || c >= m.stride {
+		return ERR_OOB
 	}
 	m.s[m.stride*r+c] = v
 	return nil
-}
-
-// Mask selected rows/columns
-func (m Mat[T]) Mask(direction Direction, indices ...int) *Mat[T] {
-	new_mat := &Mat[T]{
-		s:           m.s,
-		masked_rows: slices.Clone(m.masked_rows),
-		masked_cols: slices.Clone(m.masked_cols),
-		stride:      m.stride,
-	}
-
-	for _, ind := range indices {
-		if direction == Vertical {
-			new_mat.masked_cols[ind] = true
-		} else {
-			new_mat.masked_rows[ind] = true
-		}
-	}
-	return new_mat
 }
 
 // Pretty print
@@ -209,4 +158,29 @@ func (m Mat[T]) Sprintf(format string) string {
 
 func (m Mat[T]) String() string {
 	return m.Sprintf("%v")
+}
+
+func (v Vector[T]) Sprintf(format string) string {
+	b := new(strings.Builder)
+	b.WriteString("[ ")
+	for _, value := range v.All() {
+		b.WriteString(fmt.Sprintf(format, value))
+	}
+	b.WriteString("]")
+	return b.String()
+}
+
+func (v Vector[T]) String() string {
+	return v.Sprintf("%v ")
+}
+
+func (m Mat[T]) To2d() [][]T {
+	if m.stride < 1 {
+		return make([][]T, 0)
+	}
+	s := make([][]T, len(m.s)/m.stride)
+	for r := range len(s) {
+		s[r] = m.s[m.stride*r : m.stride*(r+1)]
+	}
+	return s
 }

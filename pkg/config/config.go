@@ -45,14 +45,22 @@ const (
 // Config file structure
 
 type ConfigFile struct {
-	Model     ModelConfig
+	Yolo      YoloConfig
+	Reid      ReidConfig
 	Backend   BackendConfig
 	Webserver WebserverConfig
 	Logging   LoggingConfig
 	Input     InputConfig
 }
 
-type ModelConfig struct {
+type ReidConfig struct {
+	Format          string
+	Path            string
+	ConfigPath      string `toml:"config_path"`
+	OutputLayerName string `toml:"output_layer_name"`
+}
+
+type YoloConfig struct {
 	Format              string
 	Path                string
 	ConfigPath          string `toml:"config_path"`
