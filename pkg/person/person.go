@@ -27,14 +27,16 @@ func nextColor() color.RGBA {
 }
 
 func (a *Associator) NewPerson(t time.Time, box image.Rectangle, descriptor []float32) (*Person, error) {
-	a.color = gamut.HueOffset(a.color, 133)
+	a.color = gamut.HueOffset(a.color, 153)
 	r, g, b, _ := a.color.RGBA()
-	descriptors := gring.NewRing[[]float32](3)
+	descriptors := gring.NewRing[[]float32](a.descriptors_to_hold)
 	descriptors.Push(descriptor)
+	trajectory := gring.NewRing[image.Point](a.trajectory_points)
+	trajectory.Push(center(box))
 	return &Person{
-		id:                generateToken(4),
+		id:                generateToken(a.token_length),
 		last_update:       t,
-		trajectory:        gring.NewRing[image.Point](40),
+		trajectory:        trajectory,
 		color:             color.RGBA{uint8(r), uint8(g), uint8(b), 255},
 		descriptors:       descriptors,
 		filter:            kalman.NewFilter(center(box), t, a.proc_noise_cov, a.meas_noise_cov),
@@ -100,4 +102,8 @@ func (p *Person) DrawTrajectory(m *gocv.Mat, w int) {
 func (p *Person) DrawCross(m *gocv.Mat, w, r int) {
 	gocv.Line(m, p.State().Add(image.Pt(-r, -r)), p.State().Add(image.Pt(r, r)), p.Color(), w)
 	gocv.Line(m, p.State().Add(image.Pt(-r, r)), p.State().Add(image.Pt(r, -r)), p.Color(), w)
+}
+
+func (p *Person) Distance(box image.Rectangle) float64 {
+	return vecLen(p.State().Sub(center(box)))
 }

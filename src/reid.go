@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"github.com/Robogera/detect/pkg/config"
+	"github.com/Robogera/detect/pkg/functions"
 	"github.com/Robogera/detect/pkg/indexed"
 	"github.com/Robogera/detect/pkg/person"
 	"gocv.io/x/gocv"
@@ -72,7 +73,12 @@ func reidentificator(
 		case frame := <-in_chan:
 			dims := frame.Value().Mat.Size()
 			deletions := associator.CleanUp(image.Rect(0, 0, dims[1], dims[0]))
-			updates := associator.Associate(frame.Value().Mat, frame.Value().Boxes, frame.Time(), cfg.Reid.ScoreThreshold)
+			updates := associator.Associate(
+				frame.Value().Mat, frame.Value().Boxes, frame.Time(),
+				func(s, d float64) float64 {
+					return functions.Gaussian(s, d, cfg.Reid.DistanceFactor)
+				},
+			)
 			logger.Info("people", "current", updates, "deleted", deletions)
 			for _, person := range associator.EnumeratedPeople() {
 				person.DrawCross(frame.Value().Mat, 2, 9)

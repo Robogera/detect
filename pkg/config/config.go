@@ -60,10 +60,10 @@ type ReidConfig struct {
 	ConfigPath      string  `toml:"config_path"`
 	OutputLayerName string  `toml:"output_layer_name"`
 	ScoreThreshold  float64 `toml:"score_threshold"`
-	SpeedThreshold  float64 `toml:"speed_threshold"`
 	SMAWindow       int     `toml:"sma_window"`
 	FramesToFollow  int     `toml:"frames_to_follow"`
 	TTL             float64 `toml:"time_to_live"`
+	DistanceFactor  float64 `toml:"distance_factor"`
 }
 
 type KalmanConfig struct {

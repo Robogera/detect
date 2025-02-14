@@ -108,9 +108,11 @@ func NewFilter(p image.Point, t time.Time, proc_noise_cov, meas_noise_cov float6
 	mat := filter.GetStatePre()
 	mat.SetFloatAt(0, 0, float32(p.X))
 	mat.SetFloatAt(0, 1, float32(p.Y))
+	filter.SetStatePre(mat)
 	mat = filter.GetStatePost()
 	mat.SetFloatAt(0, 0, float32(p.X))
 	mat.SetFloatAt(0, 1, float32(p.Y))
+	filter.SetStatePost(mat)
 	return &Filter{
 		filter: &filter, last_update: t}
 }

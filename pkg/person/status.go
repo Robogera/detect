@@ -38,12 +38,12 @@ func (ps PersonStatusNoAssLowScore) String() string {
 }
 
 type PersonStatusNoAssTooFar struct {
-	dst   float64
-	score float64
+	state, dest image.Point
+	score       float64
 }
 
 func (ps PersonStatusNoAssTooFar) String() string {
-	return fmt.Sprintf("Not associated: too far. Distance: %.2fpx, score: %.6f", ps.dst, ps.score)
+	return fmt.Sprintf("Not associated: too far. Position: %v, destination: %v, score: %.6f", ps.state, ps.dest, ps.score)
 }
 
 type PersonStatusAssociated struct {
@@ -57,11 +57,11 @@ func (ps PersonStatusAssociated) String() string {
 }
 
 type PersonStatusNew struct {
-	ass int
+	coord image.Point
 }
 
 func (ps PersonStatusNew) String() string {
-	return fmt.Sprintf("New: associated with box %d", ps.ass)
+	return fmt.Sprintf("New: associated with coord: %dx%d", ps.coord.X, ps.coord.Y)
 }
 
 type PersonStatusDeletedOOB struct {

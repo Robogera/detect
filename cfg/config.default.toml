@@ -17,11 +17,12 @@ format = "onnx" # onnx or openvino or caffe
 path = "/my/model/path/reid.onnx"
 config_path = "/my/config/path.xml" # optional
 output_layer_name = "reid_embedding"
-score_threshold = 0.006
+score_threshold = 0.001
 speed_threshold = 100
 sma_window = 5
 frames_to_follow = 3
 time_to_live = 4
+distance_factor = 45
 
 [kalman]
 process_noise_cov = 0.01

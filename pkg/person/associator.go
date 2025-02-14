@@ -23,12 +23,15 @@ type Associator struct {
 	output_layer_name              string
 	conv_params                    *gocv.ImageToBlobParams
 	color                          color.Color
-	speed_threshold                float64
+	min_score                      float64
 	sma_window                     int
 	frames_to_follow               int
 	ttl                            float64
 	cfg                            *config.ConfigFile
 	proc_noise_cov, meas_noise_cov float64
+	trajectory_points              int
+	descriptors_to_hold            int
+	token_length                   int
 }
 
 func NewAssociator(net *gocv.Net, conv_params *gocv.ImageToBlobParams, cfg *config.ConfigFile) (*Associator, error) {
@@ -36,17 +39,20 @@ func NewAssociator(net *gocv.Net, conv_params *gocv.ImageToBlobParams, cfg *conf
 		return nil, fmt.Errorf("Model has no layer %s", cfg.Reid.OutputLayerName)
 	}
 	return &Associator{
-		p:                 make(map[string]*Person, 0),
-		net:               net,
-		output_layer_name: cfg.Reid.OutputLayerName,
-		conv_params:       conv_params,
-		color:             color.RGBA{255, 0, 0, 255},
-		speed_threshold:   cfg.Reid.SpeedThreshold,
-		sma_window:        cfg.Reid.SMAWindow,
-		frames_to_follow:  cfg.Reid.FramesToFollow,
-		ttl:               cfg.Reid.TTL,
-		proc_noise_cov:    cfg.Kalman.ProcessNoiseCov,
-		meas_noise_cov:    cfg.Kalman.MeasNoiseCov,
+		p:                   make(map[string]*Person, 0),
+		net:                 net,
+		output_layer_name:   cfg.Reid.OutputLayerName,
+		conv_params:         conv_params,
+		color:               color.RGBA{255, 0, 0, 255},
+		sma_window:          cfg.Reid.SMAWindow,
+		frames_to_follow:    cfg.Reid.FramesToFollow,
+		ttl:                 cfg.Reid.TTL,
+		proc_noise_cov:      cfg.Kalman.ProcessNoiseCov,
+		meas_noise_cov:      cfg.Kalman.MeasNoiseCov,
+		min_score:           cfg.Reid.ScoreThreshold,
+		trajectory_points:   30,
+		descriptors_to_hold: 5,
+		token_length:        4,
 	}, nil
 }
 
@@ -84,7 +90,12 @@ func (a *Associator) Del(id string) {
 	delete(a.p, id)
 }
 
-func (a *Associator) Associate(m *gocv.Mat, boxes []image.Rectangle, t time.Time, threshold float64) map[string]PersonStatus {
+func (a *Associator) Associate(
+	m *gocv.Mat,
+	boxes []image.Rectangle,
+	t time.Time,
+	f func(score, dist float64) float64,
+) map[string]PersonStatus {
 	size := m.Size()
 	frame := image.Rect(0, 0, size[1], size[0])
 	detected_descriptors := make([][]float32, 0, len(boxes))
@@ -113,11 +124,12 @@ func (a *Associator) Associate(m *gocv.Mat, boxes []image.Rectangle, t time.Time
 	diss_mat := gmat.NewMat[float64](max(len(a.p), len(detected_descriptors)), max(len(detected_descriptors), len(a.p)))
 	for person_id, person := range a.EnumeratedPeople() {
 		for detection_id, detected_descriptor := range detected_descriptors {
-			dissimilarity := make([]float64, 0, person.descriptors.Size())
+			scores := make([]float64, 0, person.descriptors.Size())
 			for persons_descriptor := range person.descriptors.All() {
-				dissimilarity = append(dissimilarity, float64(seq.CosSim(persons_descriptor, detected_descriptor)))
+				scores = append(scores, float64(seq.CosSim(persons_descriptor, detected_descriptor)))
 			}
-			diss_mat.Set(person_id, detection_id, slices.Max(dissimilarity))
+			score := f(slices.Max(scores), person.Distance(boxes[detection_id]))
+			diss_mat.Set(person_id, detection_id, score)
 		}
 	}
 	ass := hung.SolveMax(diss_mat.To2d())
@@ -132,23 +144,19 @@ func (a *Associator) Associate(m *gocv.Mat, boxes []image.Rectangle, t time.Time
 		if assoc_box_ind >= len(detected_descriptors) {
 			person.Predict(t)
 			updates[person.Id()] = PersonStatusNoAss{}
-		} else if score < threshold {
+		} else if score < a.min_score {
 			person.Predict(t)
 			updates[person.Id()] = PersonStatusNoAssLowScore{score: score}
-		} else if moved, threshold := vecLen(person.State().Sub(center(boxes[assoc_box_ind]))), a.speed_threshold*time.Now().Sub(person.last_update).Seconds(); moved > threshold {
-			updates[person.Id()] = PersonStatusNoAssTooFar{score: score, dst: moved}
-			person.Predict(t)
 		} else {
 			associated_boxes[assoc_box_ind] = struct{}{}
-			updates[person.Id()] = PersonStatusAssociated{ass: assoc_box_ind, dst: moved, score: score}
+			updates[person.Id()] = PersonStatusAssociated{ass: assoc_box_ind, dst: person.Distance(boxes[assoc_box_ind]), score: score}
 			person.Update(t, boxes[assoc_box_ind], detected_descriptors[assoc_box_ind])
-			// gocv.Rectangle(m, boxes[assoc_box_ind], person.Color(), 1)
 		}
 	}
 	for box_ind, box := range boxes {
 		if _, associated := associated_boxes[box_ind]; !associated {
 			new_person, _ := a.NewPerson(t, box, detected_descriptors[box_ind])
-			updates[new_person.Id()] = PersonStatusNew{ass: box_ind}
+			updates[new_person.Id()] = PersonStatusNew{coord: new_person.State()}
 			a.p[new_person.Id()] = new_person
 		}
 	}
