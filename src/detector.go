@@ -20,7 +20,7 @@ type ProcessedFrame struct {
 
 func detector(
 	ctx context.Context,
-	logger *slog.Logger,
+	parent_logger *slog.Logger,
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[gocv.Mat],
 	out_chan chan<- indexed.Indexed[ProcessedFrame],
@@ -28,6 +28,8 @@ func detector(
 
 	// not sure if this helps
 	runtime.LockOSThread()
+
+	logger := parent_logger.With("coroutine", "detector")
 
 	var net gocv.Net
 	defer net.Close()
@@ -60,7 +62,7 @@ func detector(
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Detector cancelled by context")
+			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
 			img := frame.Value()
@@ -71,12 +73,11 @@ func detector(
 				Mat: &img,
 				Boxes: boxes,
 			}):
+			logger.Debug("Detected", "boxes", boxes)
 			case <-ctx.Done():
-				logger.Info("Streamreader cancelled by context")
+				logger.Info("Cancelled by context")
 				return context.Canceled
 			}
-
-			// img.Close()
 		}
 	}
 }

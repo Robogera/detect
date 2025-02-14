@@ -19,13 +19,13 @@ import (
 
 func webplayer(
 	ctx context.Context,
-	logger *slog.Logger,
+	parent_logger *slog.Logger,
 	cfg *config.ConfigFile, // wish I could pass this as read only to prevent subroutines messing the configuration or data races...
 	in_chan <-chan indexed.Indexed[ProcessedFrame],
 	stat_chan chan<- Statistics,
 ) error {
 
-	logger.Info("Initiating webplayer...")
+	logger := parent_logger.With("coroutine", "webplayer")
 
 	output_stream := mjpeg.NewStream()
 
@@ -42,41 +42,31 @@ func webplayer(
 	go func() {
 		err_chan <- server.ListenAndServe()
 	}()
+	defer func() {
+		shutdown_context, cancel := context.WithTimeout(
+			context.Background(),
+			time.Second*time.Duration(cfg.Webserver.ShutdownTimeoutSec))
+		defer cancel()
+		shutdown_initiated_timestamp := time.Now()
+		err := server.Shutdown(shutdown_context)
+		logger.Info(
+			"Shut down",
+			"shutdown time (sec)", time.Now().Sub(shutdown_initiated_timestamp).Seconds(),
+			"error", err)
+	}()
 
-	logger.Info("Webplayer started", "port", cfg.Webserver.Port)
+	logger.Info("Started", "port", cfg.Webserver.Port)
 
 	last_frame_timestamp := time.Now()
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Webserver cancelled by context. Shutting down...", "timeout (sec)", cfg.Webserver.ShutdownTimeoutSec)
+			logger.Info("Cancelled by context", "timeout (sec)", cfg.Webserver.ShutdownTimeoutSec)
 
-			shutdown_context, cancel := context.WithTimeout(
-				context.Background(),
-				time.Second*time.Duration(cfg.Webserver.ShutdownTimeoutSec))
-			defer cancel()
-			shutdown_initiated_timestamp := time.Now()
-			err := server.Shutdown(shutdown_context)
-			switch err {
-			case context.Canceled:
-				logger.Error(
-					"Webserver shutdown: timeout",
-					"timeout (sec)", cfg.Webserver.ShutdownTimeoutSec,
-					"error", err)
-			case nil:
-				logger.Info(
-					"Webserver shutdown: success",
-					"shutdown time (sec)", time.Now().Sub(shutdown_initiated_timestamp).Seconds(),
-					"error", err)
-			default:
-				logger.Error(
-					"Webserver shutdown: unexpected error",
-					"error", err)
-			}
 			return context.Canceled
 		case err := <-err_chan:
-			logger.Error("Server error", "port", cfg.Webserver.Port, "error", err)
+			logger.Error("Error", "port", cfg.Webserver.Port, "error", err)
 			return err
 		case frame := <-in_chan:
 			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *frame.Value().Mat)
@@ -93,7 +83,7 @@ func webplayer(
 			case stat_chan <- Statistics{time.Since(last_frame_timestamp)}:
 				last_frame_timestamp = time.Now()
 			case <-ctx.Done():
-				logger.Info("Streamreader cancelled by context")
+				logger.Info("Cancelled by context")
 				return context.Canceled
 			}
 		}

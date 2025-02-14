@@ -17,10 +17,11 @@ import (
 
 func streamreader(
 	ctx context.Context,
-	logger *slog.Logger,
+	parent_logger *slog.Logger,
 	cfg *config.ConfigFile,
 	mat_chan chan<- indexed.Indexed[gocv.Mat],
 ) error {
+	logger := parent_logger.With("coroutine", "streamreader")
 	for {
 		select {
 		case <-ctx.Done():
@@ -76,7 +77,7 @@ func _streamreader(
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Streamreader cancelled by context")
+			logger.Info("Cancelled by context")
 			return context.Canceled
 		default:
 			// Reciever of this is responsible for closing
@@ -93,7 +94,7 @@ func _streamreader(
 
 			select {
 			case <-ctx.Done():
-				logger.Info("Streamreader cancelled by context")
+				logger.Info("Cancelled by context")
 				return context.Canceled
 			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), img):
 				frame_id++

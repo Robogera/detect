@@ -18,13 +18,14 @@ import (
 
 func reidentificator(
 	ctx context.Context,
-	logger *slog.Logger,
+	parent_logger *slog.Logger,
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[ProcessedFrame],
 	out_chan chan<- indexed.Indexed[ProcessedFrame],
 ) error {
 	// not sure if this helps
 	runtime.LockOSThread()
+	logger := parent_logger.With("coroutine", "reidentificator")
 
 	var net gocv.Net
 	defer net.Close()
@@ -67,7 +68,7 @@ func reidentificator(
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Reidentificator cancelled by context")
+			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
 			dims := frame.Value().Mat.Size()

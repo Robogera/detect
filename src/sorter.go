@@ -11,9 +11,14 @@ import (
 )
 
 func sorter(
-	ctx context.Context, logger *slog.Logger, cfg *config.ConfigFile,
+	ctx context.Context,
+	parent_logger *slog.Logger,
+	cfg *config.ConfigFile,
 	unsorted_frames_chan <-chan indexed.Indexed[ProcessedFrame],
-	sorted_frames_chan chan<- indexed.Indexed[ProcessedFrame]) error {
+	sorted_frames_chan chan<- indexed.Indexed[ProcessedFrame],
+) error {
+
+	logger := parent_logger.With("coroutine", "sorter")
 
 	queue := gheap.Heap[indexed.Indexed[ProcessedFrame]]{}
 	queue.Init()
@@ -28,7 +33,7 @@ func sorter(
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Streamreader cancelled by context")
+			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-unsorted_frames_chan:
 			if frame.Id() < expected_frame {
@@ -45,7 +50,7 @@ func sorter(
 			frame := queue.Pop()
 			select {
 			case <-ctx.Done():
-				logger.Info("Streamreader cancelled by context")
+				logger.Info("Cancelled by context")
 				return context.Canceled
 			case sorted_frames_chan <- frame:
 				expected_frame = frame.Id() + 1
