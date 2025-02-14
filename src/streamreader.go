@@ -3,6 +3,7 @@ package main
 import (
 	// stdlib
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -20,7 +21,28 @@ func streamreader(
 	cfg *config.ConfigFile,
 	mat_chan chan<- indexed.Indexed[gocv.Mat],
 ) error {
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Streamreader cancelled by context")
+			return context.Canceled
+		default:
+			err := _streamreader(ctx, logger, cfg, mat_chan)
+			if errors.Is(err, context.Canceled) {
+				return err
+			} else {
+				logger.Warn("Restarting streamreader", "error", err)
+			}
+		}
+	}
+}
 
+func _streamreader(
+	ctx context.Context,
+	logger *slog.Logger,
+	cfg *config.ConfigFile,
+	mat_chan chan<- indexed.Indexed[gocv.Mat],
+) error {
 	var input_stream *gocv.VideoCapture
 	var err error
 
