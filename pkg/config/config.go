@@ -47,6 +47,7 @@ const (
 type ConfigFile struct {
 	Yolo      YoloConfig
 	Reid      ReidConfig
+	Kalman    KalmanConfig
 	Backend   BackendConfig
 	Webserver WebserverConfig
 	Logging   LoggingConfig
@@ -56,8 +57,18 @@ type ConfigFile struct {
 type ReidConfig struct {
 	Format          string
 	Path            string
-	ConfigPath      string `toml:"config_path"`
-	OutputLayerName string `toml:"output_layer_name"`
+	ConfigPath      string  `toml:"config_path"`
+	OutputLayerName string  `toml:"output_layer_name"`
+	ScoreThreshold  float64 `toml:"score_threshold"`
+	SpeedThreshold  float64 `toml:"speed_threshold"`
+	SMAWindow       int     `toml:"sma_window"`
+	FramesToFollow  int     `toml:"frames_to_follow"`
+	TTL             float64 `toml:"time_to_live"`
+}
+
+type KalmanConfig struct {
+	ProcessNoiseCov float64 `toml:"process_noise_cov"`
+	MeasNoiseCov    float64 `toml:"measurement_noise_cov"`
 }
 
 type YoloConfig struct {

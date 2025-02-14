@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"image"
+	"math"
 
 	"gonum.org/v1/gonum/mat"
 )
@@ -38,3 +39,6 @@ func generateToken(l int) string {
 	return hex.EncodeToString(b)
 }
 
+func vecLen(v image.Point) float64 {
+	return math.Sqrt(math.Pow(float64(v.X), 2) + math.Pow(float64(v.Y), 2))
+}

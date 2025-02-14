@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"image"
-	"time"
 
 	// "image/color"
 	"log/slog"
@@ -59,10 +58,10 @@ func reidentificator(
 		gocv.NewScalar(0, 0, 0, 0),
 	)
 
-	associator, err := person.NewAssociator(&net, &blob_conv_params, cfg.Reid.OutputLayerName)
+	associator, err := person.NewAssociator(&net, &blob_conv_params, cfg)
 	if err != nil {
-		logger.Error("Associator init error", "error", err)
-		return fmt.Errorf("Can't create associator: %w", err)
+		logger.Error("Can't init associator", "error", err)
+		return fmt.Errorf("Can't init associator: %w", err)
 	}
 
 	for {
@@ -72,21 +71,12 @@ func reidentificator(
 			return context.Canceled
 		case frame := <-in_chan:
 			dims := frame.Value().Mat.Size()
-			associator.CleanUp(time.Second * 3, image.Rect(0,0, dims[1], dims[0]))
-			associator.Associate(frame.Value().Mat, frame.Value().Boxes, frame.Time())
-			// for box_ind, box := range frame.Value().Boxes {
-			// 	gocv.Rectangle(frame.Value().Mat, box, color.RGBA{0, 255, 0, 64}, 1)
-			// 	gocv.PutText(frame.Value().Mat, fmt.Sprintf("%d", box_ind), box.Min, gocv.FontHersheyPlain, 4, color.RGBA{0, 255, 0, 255}, 2)
-			// }
+			deletions := associator.CleanUp(image.Rect(0, 0, dims[1], dims[0]))
+			updates := associator.Associate(frame.Value().Mat, frame.Value().Boxes, frame.Time(), cfg.Reid.ScoreThreshold)
+			logger.Info("people", "current", updates, "deleted", deletions)
 			for _, person := range associator.EnumeratedPeople() {
-				gocv.Circle(frame.Value().Mat, person.State(), 5, person.Color(), 5)
-				prev_point := person.State()
-				for point := range person.Trajectory() {
-					if (image.Point{}) != prev_point {
-						gocv.Line(frame.Value().Mat, prev_point, point, person.Color(), 3)
-					}
-					prev_point = point
-				}
+				person.DrawCross(frame.Value().Mat, 2, 9)
+				person.DrawTrajectory(frame.Value().Mat, 1)
 			}
 			select {
 			case <-ctx.Done():
@@ -96,5 +86,4 @@ func reidentificator(
 			}
 		}
 	}
-
 }

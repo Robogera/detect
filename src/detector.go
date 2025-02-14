@@ -78,6 +78,8 @@ func detector(
 				logger.Info("Cancelled by context")
 				return context.Canceled
 			}
+
+			// img.Close()
 		}
 	}
 }

@@ -22,6 +22,10 @@ func (r *Ring[T]) Size() int {
 	return r.l
 }
 
+func (r *Ring[T]) IsFull() bool {
+	return r.l == len(r.s)
+}
+
 func (r *Ring[T]) Push(e T) {
 	r.s[r.pos] = e
 	r.pos++
@@ -31,6 +35,28 @@ func (r *Ring[T]) Push(e T) {
 	if r.l < len(r.s) {
 		r.l++
 	}
+}
+
+func (r *Ring[T]) Newest() T {
+	var ret T
+	if r.l == 0 {
+		return ret
+	}
+	pos := r.pos - 1
+	if pos < 0 {
+		pos = len(r.s) + pos
+	}
+	return r.s[pos]
+}
+
+func (r *Ring[T]) Oldest() T {
+	var ret T
+	if r.l == 0 {
+		return ret
+	} else if r.l < len(r.s) {
+		return r.s[0]
+	}
+	return r.s[r.pos]
 }
 
 func (r *Ring[T]) All() iter.Seq[T] {
