@@ -10,7 +10,7 @@ type Ring[T any] struct {
 	pos int
 }
 
-func NewRing[T any](l int) *Ring[T] {
+func NewRing[T any](l uint) *Ring[T] {
 	return &Ring[T]{
 		l:   0,
 		s:   make([]T, l),
