@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ const (
 
 var cfg_path string
 var exe_dir string
+var create_default_config bool
 
 func init() {
 	// I have to this or compiler goes crazy on the next line YIKES!
@@ -42,6 +44,11 @@ func init() {
 		&cfg_path, "config",
 		default_cfg_path,
 		"Path to config file")
+
+	flag.BoolVar(
+		&create_default_config, "create",
+		false,
+		"Creates default config file in location specified in -config flag (or a default location if not specified)")
 }
 
 func main() {
@@ -50,12 +57,32 @@ func main() {
 
 	flag.Parse()
 
-	cfg, err := config.Unmarshal(cfg_path)
-	if err != nil {
-		slog.Error("Config file not loaded. Shutting down...", "provided path", cfg_path, "error", err)
+	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
+		Level:      slog.LevelInfo,
+		TimeFormat: time.RFC3339,
+		AddSource:  true,
+	}))
+
+	cfg_abs_path := filepath.Join(exe_dir, cfg_path)
+
+	if create_default_config {
+		if _, err := os.Stat(cfg_abs_path); os.IsNotExist(err) {
+			err := config.CreateDefault(cfg_abs_path)
+			if err != nil {
+				slog.Error("Can't write default config file", "path", cfg_abs_path, "error", err)
+			}
+		} else {
+			slog.Error("Will not overwrite existing file", "path", cfg_abs_path)
+		}
 		return
 	}
-	slog.Info("Config file loaded", "provided path", cfg_path)
+
+	cfg, err := config.Unmarshal(cfg_abs_path)
+	if err != nil {
+		slog.Error("Config file not loaded. Shutting down...", "provided path", cfg_abs_path, "error", err)
+		return
+	}
+	slog.Info("Config file loaded", "provided path", cfg_abs_path)
 
 	var log_level slog.Level
 
