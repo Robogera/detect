@@ -59,7 +59,7 @@ type SMA2d struct {
 	average image.Point
 }
 
-func NewSMA2d(n int) *SMA2d {
+func NewSMA2d(n uint) *SMA2d {
 	return &SMA2d{
 		average: image.Pt(0, 0),
 		data:    gring.NewRing[image.Point](n),
@@ -69,7 +69,7 @@ func NewSMA2d(n int) *SMA2d {
 func (s2 *SMA2d) Recalc(p image.Point) image.Point {
 	oldest := s2.data.Oldest()
 	if !s2.data.IsFull() {
-		s2.average = s2.average.Add(p.Sub(s2.average).Div(1+s2.data.Size()))
+		s2.average = s2.average.Add(p.Sub(s2.average).Div(1 + s2.data.Size()))
 	} else {
 		s2.average = s2.average.Add(p.Sub(oldest).Div(s2.data.Size()))
 	}
