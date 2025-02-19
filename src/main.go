@@ -102,7 +102,7 @@ func main() {
 		log_level = slog.LevelError
 	}
 
-	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
+	logger = slog.New(tint.NewHandler(os.Stdout, &tint.Options{
 		Level:      log_level,
 		TimeFormat: time.RFC3339,
 		AddSource:  true, // change to false on release version
