@@ -55,15 +55,18 @@ type ConfigFile struct {
 }
 
 type ReidConfig struct {
-	Format          string
-	Path            string
-	ConfigPath      string  `toml:"config_path"`
-	OutputLayerName string  `toml:"output_layer_name"`
-	ScoreThreshold  float64 `toml:"score_threshold"`
-	SMAWindow       int     `toml:"sma_window"`
-	FramesToFollow  int     `toml:"frames_to_follow"`
-	TTL             float64 `toml:"time_to_live"`
-	DistanceFactor  float64 `toml:"distance_factor"`
+	Format           string  `toml:"format" comment:"onnx, openvino or caffe"`
+	Path             string  `toml:"path"`
+	ConfigPath       string  `toml:"config_path" comment:"required for caffe models"`
+	OutputLayerName  string  `toml:"output_layer_name" comment:"usually 'reid_embedding'"`
+	SMAWindow        uint    `toml:"sma_window" comment:"higher values for smoother trajectory at the cost of higher delay"`
+	TotalDescriptors uint    `toml:"total_descriptors" comment:"higher values improve reidentification at the cost of performance"`
+	PredictSec       float64 `toml:"predict_sec" comment:"stops trying to predict the person's movement after specified time"`
+	ValidateSec      float64 `toml:"validate_sec" comment:"higher values filter out false positives at the cost of higher delay when discovering new people"`
+	ExpireSec        float64 `toml:"expire_sec" comment:"expire tracked people after specified time"`
+	ValidationRatio  float64 `toml:"validation_ratio" comment:"minimum ratio required to validate a person"`
+	ScoreThreshold   float64 `toml:"score_threshold" comment:"minimum score to associate people"`
+	DistanceFactor   float64 `toml:"distance_factor" comment:"how much distance affects the final reidentification score"`
 }
 
 type KalmanConfig struct {
@@ -72,38 +75,104 @@ type KalmanConfig struct {
 }
 
 type YoloConfig struct {
-	Format              string
-	Path                string
-	ConfigPath          string `toml:"config_path"`
-	Transpose           bool
+	Format              string  `toml:"format" comment:"onnx, openvino or caffe"`
+	Path                string  `toml:"path"`
+	ConfigPath          string  `toml:"config_path" comment:"required for caffe models"`
+	Transpose           bool    `toml:"transpose" comment:"set true for ultralythics-authored models"`
 	ScaleFactor         float64 `toml:"scale_factor"`
-	X                   uint
-	Y                   uint
+	X                   uint    `toml:"x"`
+	Y                   uint    `toml:"y"`
 	ConfidenceThreshold float32 `toml:"confidence_threshold"`
-	NMSThreshold        float32 `toml:"nms_threshold"`
-	PersonClassIndex    uint    `toml:"person_class_index"`
-	Threads             uint
+	NMSThreshold        float32 `toml:"nms_threshold" comment:"lower values for more aggressive filtering"`
+	PersonClassIndex    uint    `toml:"person_class_index" comment:"0 or 1 for the majority of pre-trained models"`
+	Threads             uint    `toml:"threads" comment:"higher values increase performance on multicore systems"`
 }
 
 type BackendConfig struct {
-	Device string
+	Device string `toml:"device" comment:"cpu, vpu or gpu"`
 }
 
 type InputConfig struct {
-	Type string
-	Path string
+	Type string `toml:"type" comment:"file, stream or webcam"`
+	Path string `toml:"path" comment:"for file or stream types"`
 }
 
 type WebserverConfig struct {
-	Port               uint
-	ReadTimeoutSec     uint `toml:"read_timeout_sec"`
-	WriteTimeoutSec    uint `toml:"write_timeout_sec"`
+	Port               uint `toml:"port"`
+	ReadTimeoutSec     uint `toml:"read_timeout_sec" comment:"0 for no timeout"`
+	WriteTimeoutSec    uint `toml:"write_timeout_sec" comment:"0 fot no timeout"`
 	ShutdownTimeoutSec uint `toml:"shutdown_timeout_sec"`
 }
 
 type LoggingConfig struct {
-	Level         string
-	StatPeriodSec uint `toml:"stat_period_sec"`
+	Level         string `toml:"level" comment:"debug, info, warn or error"`
+	StatPeriodSec uint   `toml:"stat_period_sec"`
+}
+
+func CreateDefault(file_path string) error {
+	config_file := new(ConfigFile)
+	config_file.Reid = ReidConfig{
+		Format:           "onnx",
+		Path:             "/my/model.onnx",
+		ConfigPath:       "/my/config.xml",
+		OutputLayerName:  "reid_embedding",
+		SMAWindow:        5,
+		TotalDescriptors: 3,
+		PredictSec:       0.3,
+		ValidateSec:      1.0,
+		ValidationRatio:  0.3,
+		ExpireSec:        2.0,
+		DistanceFactor:   100,
+		ScoreThreshold:   0.001,
+	}
+	config_file.Yolo = YoloConfig{
+		Format:              "onnx",
+		Path:                "/my/model.onnx",
+		ConfigPath:          "/my/config.xml",
+		Transpose:           false,
+		ScaleFactor:         255.0,
+		X:                   640,
+		Y:                   480,
+		ConfidenceThreshold: 0.995,
+		NMSThreshold:        0.05,
+		PersonClassIndex:    1,
+		Threads:             3,
+	}
+	config_file.Kalman = KalmanConfig{
+		ProcessNoiseCov: 0.01,
+		MeasNoiseCov:    600,
+	}
+	config_file.Backend = BackendConfig{
+		Device: "cpu",
+	}
+	config_file.Input = InputConfig{
+		Type: "stream",
+		Path: "rtsc://myweb.cam:544/Stream/111",
+	}
+	config_file.Webserver = WebserverConfig{
+		Port:               8080,
+		ReadTimeoutSec:     0,
+		WriteTimeoutSec:    0,
+		ShutdownTimeoutSec: 3,
+	}
+	config_file.Logging = LoggingConfig{
+		Level:         "info",
+		StatPeriodSec: 4,
+	}
+	file, err := os.Create(file_path)
+	defer file.Close()
+	if err != nil {
+		return fmt.Errorf("Can't create %s: %w", file_path, err)
+	}
+	data, err := toml.Marshal(config_file)
+	if err != nil {
+		return fmt.Errorf("Can't serialize default config: %w", err)
+	}
+	_, err = file.Write(data)
+	if err != nil {
+		return fmt.Errorf("Can't write to %s: %w", file_path, err)
+	}
+	return nil
 }
 
 func Unmarshal(file_path string) (*ConfigFile, error) {

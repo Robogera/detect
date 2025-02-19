@@ -15,3 +15,10 @@ func TestSanity(t *testing.T) {
 	}
 	fmt.Printf("Config: %s\n", string(pretty))
 }
+
+func TestCreate(t *testing.T) {
+	err := CreateDefault("../../cfg/empty.toml")
+	if err != nil {
+		t.Fatalf("Can't create empty config: %s", err)
+	}
+}
