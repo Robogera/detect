@@ -30,7 +30,7 @@ func center(r image.Rectangle) image.Point {
 	)
 }
 
-func generateToken(l int) string {
+func generateToken(l uint) string {
 	b := make([]byte, l)
 	_, err := rand.Read(b)
 	if err != nil {
