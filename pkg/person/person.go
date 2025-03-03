@@ -27,61 +27,79 @@ func nextColor() color.RGBA {
 }
 
 func (a *Associator) NewPerson(t time.Time, box image.Rectangle, descriptor []float32) (*Person, error) {
-	a.color = gamut.HueOffset(a.color, 153)
-	r, g, b, _ := a.color.RGBA()
-	descriptors := gring.NewRing[[]float32](a.descriptors_to_hold)
+	a.next_color = gamut.HueOffset(a.next_color, 153)
+	r, g, b, _ := a.next_color.RGBA()
+	descriptors := gring.NewRing[[]float32](a.total_descriptors)
 	descriptors.Push(descriptor)
 	trajectory := gring.NewRing[image.Point](a.trajectory_points)
 	trajectory.Push(center(box))
 	return &Person{
-		id:                generateToken(a.token_length),
-		last_update:       t,
-		trajectory:        trajectory,
-		color:             color.RGBA{uint8(r), uint8(g), uint8(b), 255},
-		descriptors:       descriptors,
-		filter:            kalman.NewFilter(center(box), t, a.proc_noise_cov, a.meas_noise_cov),
-		sma:               gsma.NewSMA2d(a.sma_window),
-		missed_frames:     0,
-		max_missed_frames: a.frames_to_follow,
+		id:           generateToken(a.token_length),
+		last_update:  t,
+		trajectory:   trajectory,
+		color:        color.RGBA{uint8(r), uint8(g), uint8(b), 255},
+		descriptors:  descriptors,
+		filter:       kalman.NewFilter(center(box), t, a.proc_noise_cov, a.meas_noise_cov),
+		sma:          gsma.NewSMA2d(a.sma_window),
+		total_hits:   0,
+		total_misses: 0,
+		valid:        false,
+		last_box:     box,
 	}, nil
 }
 
 type Person struct {
-	id                               string
-	last_update                      time.Time
-	trajectory                       *gring.Ring[image.Point]
-	color                            color.RGBA
-	descriptors                      *gring.Ring[[]float32]
-	filter                           *kalman.Filter
-	sma                              *gsma.SMA2d
-	missed_frames, max_missed_frames int
+	id                       string
+	created                  time.Time
+	last_update              time.Time
+	trajectory               *gring.Ring[image.Point]
+	color                    color.RGBA
+	descriptors              *gring.Ring[[]float32]
+	filter                   *kalman.Filter
+	sma                      *gsma.SMA2d
+	total_hits, total_misses uint
+	valid                    bool
+	last_box                 image.Rectangle
 }
 
 func (p *Person) Id() string        { return p.id }
 func (p *Person) Color() color.RGBA { return p.color }
-func (p *Person) NotUpdatedFor(t time.Duration) bool {
-	return p.last_update.Add(t).Before(time.Now())
+func (p *Person) SinceUpdate(t time.Time) time.Duration {
+	return t.Sub(p.last_update)
 }
 func (p *Person) Trajectory() iter.Seq[image.Point] {
 	return p.trajectory.All()
 }
+func (p *Person) IsValid() bool {
+	return p.valid
+}
+
+func (p *Person) Validate(t time.Time, validation_duration time.Duration, validation_ratio float64) {
+	if !p.valid {
+		hit_ratio := float64(p.total_hits) / float64(p.total_hits+p.total_misses)
+		if t.Sub(p.created) > validation_duration && hit_ratio >= validation_ratio {
+			p.valid = true
+		}
+	}
+}
 
 func (p *Person) Update(t time.Time, box image.Rectangle, descriptor []float32) error {
-	p.missed_frames = 0
-	p.trajectory.Push(p.sma.Recalc(p.filter.State()))
+	p.total_hits++
 	p.descriptors.Push(descriptor)
 	p.filter.Update(center(box), t)
+	p.trajectory.Push(p.sma.Recalc(p.filter.State()))
 	p.last_update = t
+	p.last_box = box
 	return nil
 }
 
-func (p *Person) Predict(t time.Time) error {
-	p.missed_frames++
-	p.trajectory.Push(p.sma.Recalc(p.filter.State()))
-	if p.missed_frames >= p.max_missed_frames {
-		return nil
+func (p *Person) Predict(t time.Time, prediction_duration time.Duration) error {
+	p.total_misses++
+	if t.Sub(p.last_update) < prediction_duration {
+		p.filter.Predict(t)
 	}
-	p.filter.Predict(t)
+	p.trajectory.Push(p.sma.Recalc(p.filter.State()))
+	p.last_box = image.Rect(0, 0, 0, 0)
 	return nil
 }
 
@@ -89,19 +107,29 @@ func (p *Person) State() image.Point {
 	return p.trajectory.Newest()
 }
 
-func (p *Person) DrawTrajectory(m *gocv.Mat, w int) {
+func (p *Person) DrawTrajectory(m *gocv.Mat, w int, alpha uint8) {
+	c := p.Color()
+	c.A = alpha
 	prev_point := p.State()
 	for point := range p.Trajectory() {
 		if (image.Point{}) != prev_point {
-			gocv.Line(m, prev_point, point, p.Color(), w)
+			gocv.Line(m, prev_point, point, c, w)
 		}
 		prev_point = point
 	}
 }
 
-func (p *Person) DrawCross(m *gocv.Mat, w, r int) {
-	gocv.Line(m, p.State().Add(image.Pt(-r, -r)), p.State().Add(image.Pt(r, r)), p.Color(), w)
-	gocv.Line(m, p.State().Add(image.Pt(-r, r)), p.State().Add(image.Pt(r, -r)), p.Color(), w)
+func (p *Person) DrawCross(m *gocv.Mat, w, r int, alpha uint8) {
+	c := p.Color()
+	c.A = alpha
+	gocv.Line(m, p.State().Add(image.Pt(-r, -r)), p.State().Add(image.Pt(r, r)), c, w)
+	gocv.Line(m, p.State().Add(image.Pt(-r, r)), p.State().Add(image.Pt(r, -r)), c, w)
+}
+
+func (p *Person) DrawBox(m *gocv.Mat, w int) {
+	if !p.last_box.Empty() {
+		gocv.Rectangle(m, p.last_box, p.Color(), w)
+	}
 }
 
 func (p *Person) Distance(box image.Rectangle) float64 {

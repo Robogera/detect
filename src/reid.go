@@ -72,7 +72,7 @@ func reidentificator(
 			return context.Canceled
 		case frame := <-in_chan:
 			dims := frame.Value().Mat.Size()
-			deletions := associator.CleanUp(image.Rect(0, 0, dims[1], dims[0]))
+			deletions := associator.CleanUp(frame.Time(), image.Rect(0, 0, dims[1], dims[0]))
 			updates := associator.Associate(
 				frame.Value().Mat, frame.Value().Boxes, frame.Time(),
 				func(s, d float64) float64 {
@@ -80,9 +80,14 @@ func reidentificator(
 				},
 			)
 			logger.Info("people", "current", updates, "deleted", deletions)
-			for _, person := range associator.EnumeratedPeople() {
-				person.DrawCross(frame.Value().Mat, 2, 9)
-				person.DrawTrajectory(frame.Value().Mat, 1)
+			for _, person := range associator.EnumeratePeople() {
+				alpha := uint8(25)
+				if person.IsValid() {
+					alpha = 255
+				}
+				person.DrawCross(frame.Value().Mat, 2, 9, alpha)
+				person.DrawBox(frame.Value().Mat, 1)
+				person.DrawTrajectory(frame.Value().Mat, 1, alpha)
 			}
 			select {
 			case <-ctx.Done():
