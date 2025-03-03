@@ -22,7 +22,7 @@ func detector(
 	ctx context.Context,
 	parent_logger *slog.Logger,
 	cfg *config.ConfigFile,
-	in_chan <-chan indexed.Indexed[gocv.Mat],
+	in_chan <-chan indexed.Indexed[*gocv.Mat],
 	out_chan chan<- indexed.Indexed[ProcessedFrame],
 ) error {
 
@@ -59,18 +59,29 @@ func detector(
 	}
 	logger.Debug("Model info", "model", cfg.Yolo.Path, "output layers", output_layer_names)
 
+	blob_conv_params := gocv.NewImageToBlobParams(
+		1.0/cfg.Yolo.ScaleFactor,
+		image.Pt(int(cfg.Yolo.X), int(cfg.Yolo.Y)),
+		gocv.NewScalar(0, 0, 0, 0),
+		true,
+		gocv.MatTypeCV32F,
+		gocv.DataLayoutNCHW,
+		gocv.PaddingModeLetterbox,
+		gocv.NewScalar(0, 0, 0, 0),
+	)
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
-			img := frame.Value()
-			boxes, _ := yolo.Detect(&net, &img, cfg, output_layer_names)
-
+			boxes, err := yolo.Detect(&net, frame.Value(), cfg, output_layer_names, &blob_conv_params)
+      if err != nil {
+				logger.Error("Detection failure", "error", err)
+      }
 			select {
 			case out_chan <- indexed.NewIndexed(frame.Id(), frame.Time(), ProcessedFrame{
-				Mat: &img,
+				Mat: frame.Value(),
 				Boxes: boxes,
 			}):
 			logger.Debug("Detected", "boxes", boxes)

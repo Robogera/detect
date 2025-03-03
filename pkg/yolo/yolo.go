@@ -7,22 +7,8 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func Detect(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string) ([]image.Rectangle, error) {
-	// profile this and maybe don't clone
-	cloned_img := gocv.NewMat()
-	defer cloned_img.Close()
-	img.ConvertTo(&cloned_img, gocv.MatTypeCV32F) // No idea which format to use
-	blob_conv_params := gocv.NewImageToBlobParams(
-		1.0/cfg.Yolo.ScaleFactor,
-		image.Pt(int(cfg.Yolo.X), int(cfg.Yolo.Y)),
-		gocv.NewScalar(0, 0, 0, 0),
-		true,
-		gocv.MatTypeCV32F,
-		gocv.DataLayoutNCHW,
-		gocv.PaddingModeLetterbox,
-		gocv.NewScalar(0, 0, 0, 0),
-	)
-	blob := gocv.BlobFromImageWithParams(cloned_img, blob_conv_params)
+func Detect(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_names []string, params *gocv.ImageToBlobParams) ([]image.Rectangle, error) {
+	blob := gocv.BlobFromImageWithParams(*img, *params)
 	defer blob.Close()
 
 	net.SetInput(blob, "")
@@ -71,7 +57,7 @@ func Detect(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_n
 		}
 		output_2d.Close()
 
-		boxes = blob_conv_params.BlobRectsToImageRects(boxes, image.Pt(cloned_img.Cols(), cloned_img.Rows()))
+		boxes = params.BlobRectsToImageRects(boxes, image.Pt(img.Cols(), img.Rows()))
 
 		indices := gocv.NMSBoxes(boxes, confidences, cfg.Yolo.ConfidenceThreshold, cfg.Yolo.NMSThreshold)
 

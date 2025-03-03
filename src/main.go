@@ -121,7 +121,7 @@ func main() {
 
 	stat_chan := make(chan Statistics, 8)
 
-	mat_chan := make(chan indexed.Indexed[gocv.Mat], 8)
+	mat_chan := make(chan indexed.Indexed[*gocv.Mat], 8)
 
 	export_chan := make(chan indexed.Indexed[[]*person.ExportedPerson], 8)
 

@@ -19,7 +19,7 @@ func streamreader(
 	ctx context.Context,
 	parent_logger *slog.Logger,
 	cfg *config.ConfigFile,
-	mat_chan chan<- indexed.Indexed[gocv.Mat],
+	mat_chan chan<- indexed.Indexed[*gocv.Mat],
 ) error {
 	logger := parent_logger.With("coroutine", "streamreader")
 	for {
@@ -42,7 +42,7 @@ func _streamreader(
 	ctx context.Context,
 	logger *slog.Logger,
 	cfg *config.ConfigFile,
-	mat_chan chan<- indexed.Indexed[gocv.Mat],
+	mat_chan chan<- indexed.Indexed[*gocv.Mat],
 ) error {
 	var input_stream *gocv.VideoCapture
 	var err error
@@ -84,6 +84,7 @@ func _streamreader(
 			img := gocv.NewMat()
 			if !input_stream.Read(&img) {
 				logger.Error("Can't read next frame. Shutting down...", "stream", cfg.Input.Path)
+				img.Close()
 				return ERR_STREAM_ENDED
 			}
 			if img.Empty() {
@@ -96,7 +97,7 @@ func _streamreader(
 			case <-ctx.Done():
 				logger.Info("Cancelled by context")
 				return context.Canceled
-			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), img):
+			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), &img):
 				frame_id++
 			}
 		}
