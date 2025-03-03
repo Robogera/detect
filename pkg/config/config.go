@@ -52,6 +52,16 @@ type ConfigFile struct {
 	Webserver WebserverConfig
 	Logging   LoggingConfig
 	Input     InputConfig
+	Mqtt      MqttConfig
+}
+
+type MqttConfig struct {
+	Address   string `toml:"address"`
+	Port      uint   `toml:"port" comment:"usually 1883"`
+	TopicName string `toml:"topic_name"`
+	ClientID  string `toml:"client_id"`
+	Username  string `toml:"username"`
+	Password  string `toml:"password"`
 }
 
 type ReidConfig struct {
