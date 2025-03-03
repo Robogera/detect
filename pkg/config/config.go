@@ -96,6 +96,7 @@ type YoloConfig struct {
 	NMSThreshold        float32 `toml:"nms_threshold" comment:"lower values for more aggressive filtering"`
 	PersonClassIndex    uint    `toml:"person_class_index" comment:"0 or 1 for the majority of pre-trained models"`
 	Threads             uint    `toml:"threads" comment:"higher values increase performance on multicore systems"`
+	SortingFPS          uint    `toml:"sorting_fps" comment:"frequency of post-yolo sorter output"`
 }
 
 type BackendConfig struct {

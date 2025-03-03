@@ -26,7 +26,7 @@ func sorter(
 	// TODO: move to config
 	// OR calculate the moving average of the incomig frametime and adjust
 	// the ticker period based on it
-	ticker := time.NewTicker(time.Second / 60)
+	ticker := time.NewTicker(time.Second / time.Duration(cfg.Yolo.SortingFPS))
 
 	var expected_frame uint64 = 0
 
