@@ -35,7 +35,7 @@ func mqttclient(
 				return nil
 			},
 		})
-	connection, err := net.Dial("tcp", cfg.Mqtt.Address+fmt.Sprintf("%d", cfg.Mqtt.Port))
+    connection, err := net.Dial("tcp", cfg.Mqtt.Address+":"+fmt.Sprintf("%d", cfg.Mqtt.Port))
 	if err != nil {
 		logger.Error("TCP connection failed",
 			"host", cfg.Mqtt.Address, "port", cfg.Mqtt.Port, "error", err)
