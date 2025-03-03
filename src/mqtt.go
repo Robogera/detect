@@ -88,7 +88,7 @@ func mqttclient(
 			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
-			base_vars.PacketIdentifier = uint16(frame.Id())
+			base_vars.PacketIdentifier = uint16(frame.Id()+1)
 			base_command.Message = &synapse.Message{People: frame.Value()}
 			base_command.Id = uint(frame.Id()+1)
 			payload, err := base_command.ToPayload()
