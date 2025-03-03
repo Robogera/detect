@@ -44,10 +44,18 @@ func mqttclient(
 
 	connection_ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
+  var username_bytes, password_bytes []byte
+  if cfg.Mqtt.Username != "" {
+    username_bytes = []byte(cfg.Mqtt.Username)
+  }
+  if cfg.Mqtt.Password != "" {
+    password_bytes = []byte(cfg.Mqtt.Password)
+  }
 	vars := &mqtt.VariablesConnect{
 		ClientID: []byte(cfg.Mqtt.ClientID),
-		Username: []byte(cfg.Mqtt.Username),
-		Password: []byte(cfg.Mqtt.Password),
+    Protocol: []byte("mqtt"),
+		Username: username_bytes,
+		Password: password_bytes,
 	}
 	err = client.Connect(connection_ctx, connection, vars)
 	if err != nil {
