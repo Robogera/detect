@@ -4,6 +4,7 @@ import (
 	// stdlib
 	"context"
 	"fmt"
+	"image"
 	"log/slog"
 	"net/http"
 	"time"
@@ -69,6 +70,9 @@ func webplayer(
 			logger.Error("Error", "port", cfg.Webserver.Port, "error", err)
 			return err
 		case frame := <-in_chan:
+			if cfg.Webserver.W != 0 && cfg.Webserver.H != 0 {
+				gocv.Resize(*frame.Value().Mat, frame.Value().Mat, image.Pt(int(cfg.Webserver.W), int(cfg.Webserver.H)), 1, 1, gocv.InterpolationLinear)
+			}
 			buf, err := gocv.IMEncode(gocv.JPEGFileExt, *frame.Value().Mat)
 			if err != nil {
 				logger.Error("Can't encode frame")

@@ -113,6 +113,8 @@ type WebserverConfig struct {
 	ReadTimeoutSec     uint `toml:"read_timeout_sec" comment:"0 for no timeout"`
 	WriteTimeoutSec    uint `toml:"write_timeout_sec" comment:"0 fot no timeout"`
 	ShutdownTimeoutSec uint `toml:"shutdown_timeout_sec"`
+	W                  uint `toml:"width" comment:"if either is zero - no resizing will be done"`
+	H                  uint `toml:"height" comment:"if either is zero - no resizing will be done"`
 }
 
 type LoggingConfig struct {
