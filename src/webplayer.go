@@ -32,7 +32,7 @@ func webplayer(
 	http.Handle("/", output_stream)
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf("127.0.0.1:%d", cfg.Webserver.Port),
+		Addr:         fmt.Sprintf("0.0.0.0:%d", cfg.Webserver.Port),
 		ReadTimeout:  time.Duration(cfg.Webserver.ReadTimeoutSec) * time.Second,
 		WriteTimeout: time.Duration(cfg.Webserver.WriteTimeoutSec) * time.Second,
 	}
