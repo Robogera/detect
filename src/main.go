@@ -14,6 +14,7 @@ import (
 	// internal
 	"github.com/Robogera/detect/pkg/config"
 	"github.com/Robogera/detect/pkg/indexed"
+	"github.com/Robogera/detect/pkg/person"
 	"github.com/Robogera/detect/pkg/rpath"
 	"gocv.io/x/gocv"
 
@@ -122,6 +123,8 @@ func main() {
 
 	mat_chan := make(chan indexed.Indexed[gocv.Mat], 8)
 
+	export_chan := make(chan indexed.Indexed[[]*person.ExportedPerson], 8)
+
 	eg.Go(func() error {
 		return streamreader(child_ctx, logger, cfg, mat_chan)
 	})
@@ -137,7 +140,11 @@ func main() {
 	})
 
 	eg.Go(func() error {
-		return reidentificator(child_ctx, logger, cfg, sorted_frames_chan, ident_frames_chan)
+		return reidentificator(child_ctx, logger, cfg, sorted_frames_chan, ident_frames_chan, export_chan)
+	})
+
+	eg.Go(func() error {
+		return mqttclient(child_ctx, logger, cfg, export_chan)
 	})
 
 	eg.Go(func() error {

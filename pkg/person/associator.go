@@ -162,3 +162,7 @@ func (a *Associator) CleanUp(t time.Time, bounds image.Rectangle) map[string]Per
 	}
 	return deletions
 }
+
+func (a *Associator) TotalPeople() int {
+	return len(a.p)
+}

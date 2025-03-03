@@ -22,6 +22,7 @@ func reidentificator(
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[ProcessedFrame],
 	out_chan chan<- indexed.Indexed[ProcessedFrame],
+	export_chan chan<- indexed.Indexed[[]*person.ExportedPerson],
 ) error {
 	// not sure if this helps
 	runtime.LockOSThread()
@@ -80,7 +81,9 @@ func reidentificator(
 				},
 			)
 			logger.Info("people", "current", updates, "deleted", deletions)
+			export := make([]*person.ExportedPerson, 0, associator.TotalPeople())
 			for _, person := range associator.EnumeratePeople() {
+				export = append(export, person.Export())
 				alpha := uint8(25)
 				if person.IsValid() {
 					alpha = 255
@@ -94,6 +97,12 @@ func reidentificator(
 				logger.Info("Streamreader cancelled by context")
 				return context.Canceled
 			case out_chan <- frame:
+			}
+			select {
+			case <-ctx.Done():
+				logger.Info("Streamreader cancelled by context")
+				return context.Canceled
+			case export_chan <- indexed.NewIndexed(frame.Id(), frame.Time(), export):
 			}
 		}
 	}

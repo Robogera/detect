@@ -56,6 +56,9 @@ func mqttclient(
 			"username", cfg.Mqtt.Username, "error", err)
 		return err
 	}
+	logger.Info("MQTT connection established",
+		"host", cfg.Mqtt.Address, "port", cfg.Mqtt.Port, "client_id", cfg.Mqtt.ClientID,
+		"username", cfg.Mqtt.Username)
 	qos := mqtt.QoS0
 	pub_flags, err := mqtt.NewPublishFlags(qos, false, false)
 	if err != nil {
