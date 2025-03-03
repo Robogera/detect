@@ -90,7 +90,7 @@ func mqttclient(
 		case frame := <-in_chan:
 			base_vars.PacketIdentifier = uint16(frame.Id()+1)
 			base_command.Message = &synapse.Message{People: frame.Value()}
-			base_command.Id = uint(frame.Id()+1)
+			base_command.Id = uint(frame.Id())
 			payload, err := base_command.ToPayload()
 			if err != nil {
 				logger.Error("Can't marshal payload", "frame_id", frame.Id(), "message", frame.Value(), "error", err)
