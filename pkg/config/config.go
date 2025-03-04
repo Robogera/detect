@@ -90,8 +90,8 @@ type YoloConfig struct {
 	ConfigPath          string  `toml:"config_path" comment:"required for caffe models"`
 	Transpose           bool    `toml:"transpose" comment:"set true for ultralythics-authored models"`
 	ScaleFactor         float64 `toml:"scale_factor"`
-	W                   uint    `toml:"x"`
-	H                   uint    `toml:"y"`
+	W                   uint    `toml:"w"`
+	H                   uint    `toml:"h"`
 	ConfidenceThreshold float32 `toml:"confidence_threshold"`
 	NMSThreshold        float32 `toml:"nms_threshold" comment:"lower values for more aggressive filtering"`
 	PersonClassIndex    uint    `toml:"person_class_index" comment:"0 or 1 for the majority of pre-trained models"`
