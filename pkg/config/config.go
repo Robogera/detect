@@ -90,8 +90,8 @@ type YoloConfig struct {
 	ConfigPath          string  `toml:"config_path" comment:"required for caffe models"`
 	Transpose           bool    `toml:"transpose" comment:"set true for ultralythics-authored models"`
 	ScaleFactor         float64 `toml:"scale_factor"`
-	X                   uint    `toml:"x"`
-	Y                   uint    `toml:"y"`
+	W                   uint    `toml:"x"`
+	H                   uint    `toml:"y"`
 	ConfidenceThreshold float32 `toml:"confidence_threshold"`
 	NMSThreshold        float32 `toml:"nms_threshold" comment:"lower values for more aggressive filtering"`
 	PersonClassIndex    uint    `toml:"person_class_index" comment:"0 or 1 for the majority of pre-trained models"`
@@ -144,8 +144,8 @@ func CreateDefault(file_path string) error {
 		ConfigPath:          "/my/config.xml",
 		Transpose:           false,
 		ScaleFactor:         255.0,
-		X:                   640,
-		Y:                   480,
+		W:                   640,
+		H:                   480,
 		ConfidenceThreshold: 0.995,
 		NMSThreshold:        0.05,
 		PersonClassIndex:    1,

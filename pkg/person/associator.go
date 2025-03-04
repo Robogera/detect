@@ -64,7 +64,7 @@ func (a *Associator) EnumeratePeople() []*Person {
 	for _, person := range a.p {
 		people = append(people, person)
 	}
-	return nil
+	return people
 }
 
 func (a *Associator) Add(p *Person) {

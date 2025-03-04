@@ -61,7 +61,7 @@ func detector(
 
 	blob_conv_params := gocv.NewImageToBlobParams(
 		1.0/cfg.Yolo.ScaleFactor,
-		image.Pt(int(cfg.Yolo.X), int(cfg.Yolo.Y)),
+		image.Pt(int(cfg.Yolo.W), int(cfg.Yolo.H)),
 		gocv.NewScalar(0, 0, 0, 0),
 		true,
 		gocv.MatTypeCV32F,
@@ -84,7 +84,7 @@ func detector(
 				Mat: frame.Value(),
 				Boxes: boxes,
 			}):
-			logger.Debug("Detected", "boxes", boxes)
+			logger.Info("Detected", "boxes", boxes)
 			case <-ctx.Done():
 				logger.Info("Cancelled by context")
 				return context.Canceled
