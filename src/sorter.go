@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"time"
 
 	"github.com/Robogera/detect/pkg/config"
@@ -17,6 +18,9 @@ func sorter(
 	unsorted_frames_chan <-chan indexed.Indexed[ProcessedFrame],
 	sorted_frames_chan chan<- indexed.Indexed[ProcessedFrame],
 ) error {
+
+	// not sure if this helps
+	runtime.LockOSThread()
 
 	logger := parent_logger.With("coroutine", "sorter")
 
@@ -37,6 +41,8 @@ func sorter(
 			return context.Canceled
 		case frame := <-unsorted_frames_chan:
 			if frame.Id() < expected_frame {
+        logger.Warn("Bad index", "expected", expected_frame, "got", frame.Id())
+        frame.Value().Mat.Close()
 				continue
 			}
 			queue.Push(frame)
@@ -53,6 +59,7 @@ func sorter(
 				logger.Info("Cancelled by context")
 				return context.Canceled
 			case sorted_frames_chan <- frame:
+        logger.Debug("Queue", "len", queue.Len())
 				expected_frame = frame.Id() + 1
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"image"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"time"
 
 	// internal
@@ -25,6 +26,9 @@ func webplayer(
 	in_chan <-chan indexed.Indexed[ProcessedFrame],
 	stat_chan chan<- Statistics,
 ) error {
+
+	// not sure if this helps
+	runtime.LockOSThread()
 
 	logger := parent_logger.With("coroutine", "webplayer")
 

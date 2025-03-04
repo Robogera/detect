@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime"
 	"time"
 
 	// internal
@@ -21,6 +22,10 @@ func streamreader(
 	cfg *config.ConfigFile,
 	mat_chan chan<- indexed.Indexed[*gocv.Mat],
 ) error {
+
+	// not sure if this helps
+	runtime.LockOSThread()
+
 	logger := parent_logger.With("coroutine", "streamreader")
 	for {
 		select {
