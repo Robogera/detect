@@ -64,7 +64,7 @@ func reidentificator(
 		1.0,
 		image.Pt(128, 256),
 		gocv.NewScalar(0, 0, 0, 0),
-		true,
+		false,
 		gocv.MatTypeCV32F,
 		gocv.DataLayoutNCHW,
 		gocv.PaddingModeLetterbox,
@@ -84,25 +84,26 @@ func reidentificator(
 			return context.Canceled
 		case frame := <-in_chan:
 			dims := frame.Value().Mat.Size()
-			deletions := associator.CleanUp(frame.Time(), image.Rect(0, 0, dims[1], dims[0]))
-			updates := associator.Associate(
+			associator.CleanUp(frame.Time(), image.Rect(0, 0, dims[1], dims[0]))
+			associator.Associate(
 				frame.Value().Mat, frame.Value().Boxes, frame.Time(),
 				func(s, d float64) float64 {
 					return functions.Gaussian(s, d, cfg.Reid.DistanceFactor)
 				},
 			)
-			logger.Info("people", "current", updates, "deleted", deletions)
-			export := make([]*person.ExportedPerson, 0, associator.TotalPeople())
-			for _, person := range associator.EnumeratePeople() {
+			people := associator.EnumeratePeople()
+			status := make(map[string]string, len(people))
+			export := make([]*person.ExportedPerson, 0, len(people))
+			for _, person := range people {
 				export = append(export, person.Export())
-				alpha := uint8(25)
+				status[person.Id()] = string(person.Status())
 				if person.IsValid() {
-					alpha = 255
+					person.DrawCross(frame.Value().Mat, 2, 9, 255)
 				}
-				person.DrawCross(frame.Value().Mat, 2, 9, alpha)
 				person.DrawBox(frame.Value().Mat, 1)
-				person.DrawTrajectory(frame.Value().Mat, 1, alpha)
+				// person.DrawTrajectory(frame.Value().Mat, 1, alpha)
 			}
+			logger.Info("People", "status", status)
 			select {
 			case <-ctx.Done():
 				logger.Info("Streamreader cancelled by context")

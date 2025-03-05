@@ -76,6 +76,7 @@ type ReidConfig struct {
 	PredictSec        float64 `toml:"predict_sec" comment:"stops trying to predict the person's movement after specified time"`
 	ValidateSec       float64 `toml:"validate_sec" comment:"higher values filter out false positives at the cost of higher delay when discovering new people"`
 	ExpireSec         float64 `toml:"expire_sec" comment:"expire tracked people after specified time"`
+	NonValidExpireSec float64 `toml:"nonvalid_expire_sec" comment:"expire unvalidated people after specified time"`
 	ValidationFrames  uint    `toml:"validation_frames" comment:"minimum frames to detect before validation_duration to validate"`
 	ScoreThreshold    float64 `toml:"score_threshold" comment:"minimum score to associate people"`
 	DistanceFactor    float64 `toml:"distance_factor" comment:"divide distances above threshold"`

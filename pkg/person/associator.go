@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"slices"
 	"time"
 
 	"github.com/Robogera/detect/pkg/config"
@@ -15,21 +14,23 @@ import (
 	"gocv.io/x/gocv"
 )
 
+type Detection struct {
+	Box        image.Rectangle
+	Descriptor []float32
+	Associated bool
+}
+
 type Associator struct {
-	p                   map[string]*Person
-	net                 *gocv.Net
-	output_layer_name   string
-	conv_params         *gocv.ImageToBlobParams
-	min_score           float64
-	sma_window          uint
-	validation_duration time.Duration
-	prediction_duration time.Duration
-	expiration_duration time.Duration
-	proc_noise_cov      float64
-	meas_noise_cov      float64
-	total_descriptors   uint
-	token_length        uint
-	validation_ratio    float64
+	p           map[string]*Person
+	net         *gocv.Net
+	conv_params *gocv.ImageToBlobParams
+
+	validation_duration          time.Duration
+	prediction_duration          time.Duration
+	expiration_duration          time.Duration
+	nonvalid_expiration_duration time.Duration
+
+	cfg *config.ConfigFile
 	// visual stuff
 	trajectory_points uint
 	next_color        color.Color
@@ -40,22 +41,16 @@ func NewAssociator(net *gocv.Net, conv_params *gocv.ImageToBlobParams, cfg *conf
 		return nil, fmt.Errorf("Model has no layer %s", cfg.Reid.OutputLayerName)
 	}
 	return &Associator{
-		p:                   make(map[string]*Person, 0),
-		net:                 net,
-		output_layer_name:   cfg.Reid.OutputLayerName,
-		conv_params:         conv_params,
-		token_length:        6,
-		sma_window:          cfg.Reid.SMAWindow,
-		proc_noise_cov:      cfg.Kalman.ProcessNoiseCov,
-		meas_noise_cov:      cfg.Kalman.MeasNoiseCov,
-		min_score:           cfg.Reid.ScoreThreshold,
-		validation_duration: time.Duration(cfg.Reid.ValidateSec) * time.Second,
-		expiration_duration: time.Duration(cfg.Reid.ExpireSec) * time.Second,
-		prediction_duration: time.Duration(cfg.Reid.PredictSec) * time.Second,
-		total_descriptors:   cfg.Reid.TotalDescriptors,
-		trajectory_points:   25,
-		next_color:          color.RGBA{255, 0, 0, 255},
-		validation_ratio:    cfg.Reid.ValidationRatio,
+		p:                            make(map[string]*Person, 0),
+		net:                          net,
+		conv_params:                  conv_params,
+		validation_duration:          time.Duration(cfg.Reid.ValidateSec) * time.Second,
+		expiration_duration:          time.Duration(cfg.Reid.ExpireSec) * time.Second,
+		nonvalid_expiration_duration: time.Duration(cfg.Reid.NonValidExpireSec) * time.Second,
+		prediction_duration:          time.Duration(cfg.Reid.PredictSec) * time.Second,
+		cfg:                          cfg,
+		trajectory_points:            25,
+		next_color:                   color.RGBA{255, 0, 0, 255},
 	}, nil
 }
 
@@ -67,11 +62,8 @@ func (a *Associator) EnumeratePeople() []*Person {
 	return people
 }
 
-func (a *Associator) Add(p *Person) {
-	a.p[p.Id()] = p
-}
-
-func (a *Associator) Del(id string) {
+func (a *Associator) del(id string) {
+	a.p[id].filter.Free()
 	delete(a.p, id)
 }
 
@@ -80,21 +72,29 @@ func (a *Associator) Associate(
 	boxes []image.Rectangle,
 	t time.Time,
 	f func(score, dist float64) float64,
-) map[string]PersonStatus {
+) {
+
 	size := m.Size()
 	frame := image.Rect(0, 0, size[1], size[0])
-	detected_descriptors := make([][]float32, 0, len(boxes))
+	detections := make([]*Detection, 0, len(boxes))
+
 	for _, box := range boxes {
 		func() {
 			if !box.In(frame) {
 				box = box.Intersect(frame)
 			}
+			// TODO: use a fraction of the frame's height or something
+			// like that for a better threshold
+			if box.Dx() < 1 || box.Dy() < 1 {
+				return
+			}
 			region := m.Region(box)
 			defer region.Close()
+			fmt.Printf("Region:%v\n", region.Size())
 			blob := gocv.BlobFromImageWithParams(region, *a.conv_params)
 			defer blob.Close()
 			a.net.SetInput(blob, "")
-			output := a.net.Forward(a.output_layer_name)
+			output := a.net.Forward(a.cfg.Reid.OutputLayerName)
 			defer output.Close()
 			ptr, err := output.DataPtrFloat32()
 			if err != nil {
@@ -102,65 +102,74 @@ func (a *Associator) Associate(
 			}
 			raw_data := make([]float32, len(ptr))
 			copy(raw_data, ptr)
-			detected_descriptors = append(detected_descriptors, raw_data)
+			detections = append(detections, &Detection{
+				Box:        box,
+				Descriptor: raw_data,
+				Associated: false,
+			})
 		}()
 	}
-	diss_mat := gmat.NewMat[float64](max(len(a.p), len(detected_descriptors)), max(len(detected_descriptors), len(a.p)))
+
+	matrix_size := max(len(a.p), len(detections))
+	diss_mat := gmat.NewMat[float64](matrix_size, matrix_size)
+
 	enumerated := a.EnumeratePeople()
-	for person_id, person := range enumerated {
-		for detection_id, detected_descriptor := range detected_descriptors {
+
+	for pid, person := range enumerated {
+		for did, detection := range detections {
 			scores := make([]float64, 0, person.descriptors.Size())
-			for persons_descriptor := range person.descriptors.All() {
-				scores = append(scores, float64(seq.CosSim(persons_descriptor, detected_descriptor)))
+			for descriptor := range person.descriptors.All() {
+				scores = append(scores, float64(seq.CosSim(descriptor, detection.Descriptor)))
 			}
-			score := f(slices.Max(scores), person.Distance(boxes[detection_id]))
-			diss_mat.Set(person_id, detection_id, score)
+			score := seq.SqrtMean(scores)
+			// punishing distant pairs with lower score
+			if overshoot := person.distance(detection.Box) - float64(a.cfg.Reid.DistanceThreshold); overshoot > 0 {
+				score /= overshoot * a.cfg.Reid.DistanceFactor
+			}
+			diss_mat.Set(pid, did, score)
 		}
 	}
-	ass := hung.SolveMax(diss_mat.To2d())
-	associated_boxes := make(map[int]struct{})
-	updates := make(map[string]PersonStatus, len(a.p))
-	for person_ind, person := range enumerated {
-		assoc_box_ind := 0
+
+	associations := hung.SolveMax(diss_mat.To2d())
+
+	for pid, person := range enumerated {
+		var did int
 		var score float64
-		for assoc_box_ind, score = range ass[person_ind] {
+		// ugly syntax but kept for compatibility with the third party
+		// kahn algo packages
+		for did, score = range associations[pid] {
 			break
 		}
-		if assoc_box_ind >= len(detected_descriptors) {
-			person.Predict(t, a.prediction_duration)
-			updates[person.Id()] = PersonStatusNoAss{}
-		} else if score < a.min_score {
-			person.Predict(t, a.prediction_duration)
-			updates[person.Id()] = PersonStatusNoAssLowScore{score: score}
+		if did >= len(detections) || score < a.cfg.Reid.ScoreThreshold {
+			// the first condition means he got associated with a "dummy"
+			// detection column
+			person.predict(t, a.prediction_duration)
 		} else {
-			associated_boxes[assoc_box_ind] = struct{}{}
-			updates[person.Id()] = PersonStatusAssociated{ass: assoc_box_ind, dst: person.Distance(boxes[assoc_box_ind]), score: score}
-			person.Update(t, boxes[assoc_box_ind], detected_descriptors[assoc_box_ind])
+			detections[did].Associated = true
+			person.update(t, detections[did].Box, detections[did].Descriptor)
 		}
-		person.Validate(t, a.validation_duration, a.validation_ratio)
+		person.validate(t, a.validation_duration, a.cfg.Reid.ValidationFrames)
 	}
-	for box_ind, box := range boxes {
-		if _, associated := associated_boxes[box_ind]; !associated {
-			new_person, _ := a.NewPerson(t, box, detected_descriptors[box_ind])
-			updates[new_person.Id()] = PersonStatusNew{coord: new_person.State()}
+	for _, detection := range detections {
+		if !detection.Associated {
+			new_person, _ := a.NewPerson(t, detection.Box, detection.Descriptor)
 			a.p[new_person.Id()] = new_person
 		}
 	}
-	return updates
 }
 
-func (a *Associator) CleanUp(t time.Time, bounds image.Rectangle) map[string]PersonStatus {
-	deletions := make(map[string]PersonStatus, 0)
+func (a *Associator) CleanUp(t time.Time, bounds image.Rectangle) {
 	for _, person := range a.p {
-		if since_update := person.SinceUpdate(t); since_update > a.expiration_duration {
-			deletions[person.Id()] = PersonStatusDeletedNoUpdates{t: since_update}
-			a.Del(person.Id())
-		} else if !person.State().In(bounds) {
-			deletions[person.Id()] = PersonStatusDeletedOOB{}
-			a.Del(person.Id())
+		if person.Status() == STATUS_EXPIRED {
+		} else {
+			since_update := person.SinceDetection(t)
+			if !person.IsValid() && since_update > a.nonvalid_expiration_duration {
+				person.last_status = STATUS_EXPIRED
+			} else if person.IsValid() && since_update > a.expiration_duration {
+				person.last_status = STATUS_EXPIRED
+			}
 		}
 	}
-	return deletions
 }
 
 func (a *Associator) TotalPeople() int {
