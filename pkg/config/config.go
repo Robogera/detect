@@ -2,9 +2,11 @@ package config
 
 import (
 	// stdlib
+	"errors"
 	"fmt"
-	"github.com/pelletier/go-toml/v2"
 	"os"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Enum types
@@ -65,18 +67,20 @@ type MqttConfig struct {
 }
 
 type ReidConfig struct {
-	Format           string  `toml:"format" comment:"onnx, openvino or caffe"`
-	Path             string  `toml:"path"`
-	ConfigPath       string  `toml:"config_path" comment:"required for caffe models"`
-	OutputLayerName  string  `toml:"output_layer_name" comment:"usually 'reid_embedding'"`
-	SMAWindow        uint    `toml:"sma_window" comment:"higher values for smoother trajectory at the cost of higher delay"`
-	TotalDescriptors uint    `toml:"total_descriptors" comment:"higher values improve reidentification at the cost of performance"`
-	PredictSec       float64 `toml:"predict_sec" comment:"stops trying to predict the person's movement after specified time"`
-	ValidateSec      float64 `toml:"validate_sec" comment:"higher values filter out false positives at the cost of higher delay when discovering new people"`
-	ExpireSec        float64 `toml:"expire_sec" comment:"expire tracked people after specified time"`
-	ValidationRatio  float64 `toml:"validation_ratio" comment:"minimum ratio required to validate a person"`
-	ScoreThreshold   float64 `toml:"score_threshold" comment:"minimum score to associate people"`
-	DistanceFactor   float64 `toml:"distance_factor" comment:"how much distance affects the final reidentification score"`
+	Format            string  `toml:"format" comment:"onnx, openvino or caffe"`
+	Path              string  `toml:"path"`
+	ConfigPath        string  `toml:"config_path" comment:"required for caffe models"`
+	OutputLayerName   string  `toml:"output_layer_name" comment:"usually 'reid_embedding'"`
+	SMAWindow         uint    `toml:"sma_window" comment:"higher values for smoother trajectory at the cost of higher delay"`
+	TotalDescriptors  uint    `toml:"total_descriptors" comment:"higher values improve reidentification at the cost of performance"`
+	PredictSec        float64 `toml:"predict_sec" comment:"stops trying to predict the person's movement after specified time"`
+	ValidateSec       float64 `toml:"validate_sec" comment:"higher values filter out false positives at the cost of higher delay when discovering new people"`
+	ExpireSec         float64 `toml:"expire_sec" comment:"expire tracked people after specified time"`
+	ValidationFrames  uint    `toml:"validation_frames" comment:"minimum frames to detect before validation_duration to validate"`
+	ScoreThreshold    float64 `toml:"score_threshold" comment:"minimum score to associate people"`
+	DistanceFactor    float64 `toml:"distance_factor" comment:"divide distances above threshold"`
+	DistanceThreshold uint    `toml:"distance_threshold" comment:"distance after which the factor is applied to score"`
+	TokenLength       uint    `toml:"token_length" comment:"only affects log readability really"`
 }
 
 type KalmanConfig struct {
@@ -122,21 +126,52 @@ type LoggingConfig struct {
 	StatPeriodSec uint   `toml:"stat_period_sec"`
 }
 
+func Migrate(file_path string) error {
+	config_file, err := Unmarshal(file_path)
+	if err != nil {
+		return err
+	}
+	new_path, err := getLegalIncrementedFileName(file_path)
+	if err != nil {
+		return err
+	}
+	os.Rename(file_path, new_path)
+	err = Write2File(config_file, file_path)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getLegalIncrementedFileName(file_path string) (string, error) {
+	for i := range int(^uint(0) >> 1) {
+		name := fmt.Sprintf("%s.%d", file_path, i)
+		if _, err := os.Stat(name); errors.Is(err, os.ErrNotExist) {
+			return name, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("fuck you")
+}
+
 func CreateDefault(file_path string) error {
 	config_file := new(ConfigFile)
 	config_file.Reid = ReidConfig{
-		Format:           "onnx",
-		Path:             "/my/model.onnx",
-		ConfigPath:       "/my/config.xml",
-		OutputLayerName:  "reid_embedding",
-		SMAWindow:        5,
-		TotalDescriptors: 3,
-		PredictSec:       0.3,
-		ValidateSec:      1.0,
-		ValidationRatio:  0.3,
-		ExpireSec:        2.0,
-		DistanceFactor:   100,
-		ScoreThreshold:   0.001,
+		Format:            "onnx",
+		Path:              "/my/model.onnx",
+		ConfigPath:        "/my/config.xml",
+		OutputLayerName:   "reid_embedding",
+		SMAWindow:         5,
+		TotalDescriptors:  3,
+		PredictSec:        0.3,
+		ValidateSec:       1.0,
+		ExpireSec:         2.0,
+		DistanceFactor:    2,
+		DistanceThreshold: 150,
+		ScoreThreshold:    0.001,
+		ValidationFrames:  5,
+		TokenLength:       4,
 	}
 	config_file.Yolo = YoloConfig{
 		Format:              "onnx",
@@ -172,6 +207,18 @@ func CreateDefault(file_path string) error {
 		Level:         "info",
 		StatPeriodSec: 4,
 	}
+	config_file.Mqtt = MqttConfig{
+		Address:   "127.0.0.1",
+		Port:      1883,
+		TopicName: "tracking",
+		ClientID:  "01",
+		Username:  "user",
+		Password:  "pass",
+	}
+	return Write2File(config_file, file_path)
+}
+
+func Write2File(config_file *ConfigFile, file_path string) error {
 	file, err := os.Create(file_path)
 	defer file.Close()
 	if err != nil {

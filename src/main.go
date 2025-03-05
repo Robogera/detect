@@ -30,6 +30,7 @@ const (
 var cfg_path string
 var exe_dir string
 var create_default_config bool
+var migrate_config bool
 
 func init() {
 	// I have to this or compiler goes crazy on the next line YIKES!
@@ -50,6 +51,11 @@ func init() {
 		&create_default_config, "create",
 		false,
 		"Creates default config file in location specified in -config flag (or a default location if not specified)")
+
+	flag.BoolVar(
+		&migrate_config, "migrate",
+		false,
+		"Migrate config")
 }
 
 func main() {
@@ -74,6 +80,12 @@ func main() {
 			}
 		} else {
 			slog.Error("Will not overwrite existing file", "path", cfg_abs_path)
+		}
+		return
+	} else if migrate_config {
+		err := config.Migrate(cfg_abs_path)
+		if err != nil {
+			slog.Error("Can't migrate config file", "path", cfg_abs_path, "error", err)
 		}
 		return
 	}
