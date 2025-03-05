@@ -96,10 +96,6 @@ func mqttclient(
 				logger.Error("Can't marshal payload", "frame_id", frame.Id(), "message", frame.Value(), "error", err)
 				return err
 			}
-			if err != nil {
-				logger.Error("Can't create header", "frame_id", frame.Id(), "message", frame.Value(), "error", err)
-				return err
-			}
 			err = client.PublishPayload(pub_flags, base_vars, payload)
 			if err != nil {
 				logger.Error("Can't publish", "frame_id", frame.Id(), "payload", string(payload), "error", err)
