@@ -20,6 +20,10 @@ type Filter struct {
 	last_update time.Time
 }
 
+func (kf *Filter) Free() {
+	kf.filter.Close()
+}
+
 func (kf *Filter) predict(dt float32) {
 	tr_mat := kf.filter.GetTransitionMatrix()
 	defer tr_mat.Close()
