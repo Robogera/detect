@@ -55,6 +55,28 @@ type ConfigFile struct {
 	Logging   LoggingConfig
 	Input     InputConfig
 	Mqtt      MqttConfig
+	Mask      MaskConfig
+	Crop      CropConfig
+}
+
+type CropConfig struct {
+	A Point
+	B Point
+}
+
+type MaskConfig struct {
+	Contours []Contour
+	Color    Color
+}
+
+type Color struct {
+	R, G, B uint8
+}
+
+type Contour []Point
+
+type Point struct {
+	X, Y uint
 }
 
 type MqttConfig struct {

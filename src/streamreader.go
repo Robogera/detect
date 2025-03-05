@@ -4,6 +4,9 @@ import (
 	// stdlib
 	"context"
 	"errors"
+	"fmt"
+	"image"
+	"image/color"
 	"log/slog"
 	"runtime"
 	"time"
@@ -15,6 +18,8 @@ import (
 	// external
 	"gocv.io/x/gocv"
 )
+
+var frame_id uint64 = 0
 
 func streamreader(
 	ctx context.Context,
@@ -77,7 +82,35 @@ func _streamreader(
 	}
 	defer input_stream.Close()
 
-	var frame_id uint64 = 0
+	var fill_zone gocv.PointsVector
+	var do_fill bool
+
+	if len(cfg.Mask.Contours) > 0 {
+		contours := make([][]image.Point, 0, len(cfg.Mask.Contours))
+		for _, points := range cfg.Mask.Contours {
+			contour := make([]image.Point, 0, len(points))
+			for _, point := range points {
+				contour = append(contour, image.Pt(int(point.X), int(point.Y)))
+			}
+			contours = append(contours, contour)
+		}
+		fill_zone = gocv.NewPointsVectorFromPoints(contours)
+		defer fill_zone.Close()
+		do_fill = true
+	}
+
+	var crop_zone image.Rectangle
+	var do_crop bool
+	if cfg.Crop.A.X != 0 || cfg.Crop.A.Y != 0 ||
+		cfg.Crop.B.X != 0 || cfg.Crop.B.Y != 0 {
+		do_crop = true
+		crop_zone = image.Rect(
+			int(cfg.Crop.A.X),
+			int(cfg.Crop.A.Y),
+			int(cfg.Crop.B.X),
+			int(cfg.Crop.B.Y),
+		)
+	}
 
 	for {
 		select {
@@ -86,23 +119,55 @@ func _streamreader(
 			return context.Canceled
 		default:
 			// Reciever of this is responsible for closing
-			img := gocv.NewMat()
-			if !input_stream.Read(&img) {
-				logger.Error("Can't read next frame. Shutting down...", "stream", cfg.Input.Path)
-				img.Close()
-				return ERR_STREAM_ENDED
-			}
-			if img.Empty() {
-				logger.Error("Empty frame received, skipping", "stream", cfg.Input.Path)
-				img.Close()
-				continue
+			var processed_img gocv.Mat
+			err := func() error {
+				img := gocv.NewMat()
+				defer img.Close()
+				if !input_stream.Read(&img) {
+					logger.Error("Can't read next frame. Shutting down...", "stream", cfg.Input.Path)
+					img.Close()
+					return ERR_STREAM_ENDED
+				}
+				if img.Empty() {
+					logger.Error("Empty frame received, skipping", "stream", cfg.Input.Path)
+					img.Close()
+					return nil
+				}
+
+				if do_crop {
+					r, c := img.Rows(), img.Cols()
+					frame := image.Rect(0, 0, c, r)
+					if !crop_zone.In(frame) {
+						logger.Warn("crop zone doesn't fit into frame", "frame", frame, "crop_zone", crop_zone)
+						crop_zone = crop_zone.Union(frame)
+					}
+					if crop_zone.Dx() < 1 || crop_zone.Dy() < 1 {
+						logger.Error("crop zone too small", "crop_zone", crop_zone)
+            return fmt.Errorf("Crop zone too small")
+					}
+					region_ptr := img.Region(crop_zone)
+					defer region_ptr.Close()
+					processed_img = region_ptr.Clone()
+				} else {
+					processed_img = img.Clone()
+				}
+
+				if do_fill {
+					gocv.FillPoly(&processed_img, fill_zone, color.RGBA{
+						cfg.Mask.Color.R, cfg.Mask.Color.G, cfg.Mask.Color.B, 255})
+				}
+
+				return nil
+			}()
+			if err != nil {
+				return err
 			}
 
 			select {
 			case <-ctx.Done():
 				logger.Info("Cancelled by context")
 				return context.Canceled
-			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), &img):
+			case mat_chan <- indexed.NewIndexed(frame_id, time.Now(), &processed_img):
 				frame_id++
 			}
 		}
