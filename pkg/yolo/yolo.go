@@ -57,13 +57,17 @@ func Detect(net *gocv.Net, img *gocv.Mat, cfg *config.ConfigFile, output_layer_n
 		}
 		output_2d.Close()
 
-		boxes = params.BlobRectsToImageRects(boxes, image.Pt(img.Cols(), img.Rows()))
+		if len(boxes) > 0 {
+			indices := gocv.NMSBoxes(boxes, confidences, cfg.Yolo.ConfidenceThreshold, cfg.Yolo.NMSThreshold)
 
-		indices := gocv.NMSBoxes(boxes, confidences, cfg.Yolo.ConfidenceThreshold, cfg.Yolo.NMSThreshold)
+			nms_boxes = make([]image.Rectangle, len(indices))
+			for i, j := range indices {
+				nms_boxes[i] = boxes[j]
+			}
+			if len(nms_boxes) > 0 {
 
-		nms_boxes = make([]image.Rectangle, len(indices))
-		for i, j := range indices {
-			nms_boxes[i] = boxes[j]
+				nms_boxes = params.BlobRectsToImageRects(nms_boxes, image.Pt(img.Cols(), img.Rows()))
+			}
 		}
 	}
 
