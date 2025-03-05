@@ -93,7 +93,9 @@ func (p *Person) predict(t time.Time, prediction_duration time.Duration) error {
 	}
 	p.trajectory.Push(p.sma.Recalc(p.filter.State()))
 	p.last_box = image.Rect(0, 0, 0, 0)
-	p.last_status = STATUS_LOST
+	if p.last_status != STATUS_EXPIRED {
+		p.last_status = STATUS_LOST
+	}
 	return nil
 }
 

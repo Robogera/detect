@@ -161,11 +161,11 @@ func (a *Associator) Associate(
 func (a *Associator) CleanUp(t time.Time, bounds image.Rectangle) {
 	for _, person := range a.p {
 		if person.Status() == STATUS_EXPIRED {
+      a.del(person.id)
 		} else {
 			since_update := person.SinceDetection(t)
-			if !person.IsValid() && since_update > a.nonvalid_expiration_duration {
-				person.last_status = STATUS_EXPIRED
-			} else if person.IsValid() && since_update > a.expiration_duration {
+			if (!person.IsValid() && since_update > a.nonvalid_expiration_duration) ||
+				(person.IsValid() && since_update > a.expiration_duration) {
 				person.last_status = STATUS_EXPIRED
 			}
 		}
