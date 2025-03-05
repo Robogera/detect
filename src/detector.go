@@ -46,6 +46,17 @@ func detector(
 		net = gocv.ReadNet(cfg.Yolo.Path, cfg.Yolo.ConfigPath)
 	}
 
+	err := net.SetPreferableBackend(gocv.NetBackendOpenVINO)
+	if err != nil {
+		logger.Error("Can't set openvino backend", "model", cfg.Yolo.Path)
+		return ERR_BAD_MODEL
+	}
+	err = net.SetPreferableTarget(gocv.NetTargetCPU)
+	if err != nil {
+		logger.Error("Can't set cpu backend", "model", cfg.Yolo.Path)
+		return ERR_BAD_MODEL
+	}
+
 	if net.Empty() {
 		logger.Error("Error reading network model")
 		return ERR_BAD_MODEL
