@@ -3,6 +3,7 @@ package seq
 import (
 	"cmp"
 	"iter"
+	"math"
 )
 
 type Int interface {
@@ -97,4 +98,13 @@ func Sum[T cmp.Ordered](s []T) (sum T) {
 		sum += v
 	}
 	return
+}
+
+func SqrtMean[T Float | Int](s []T) float64 {
+	var mean float64
+	for _, v := range s {
+		mean += float64(v * v)
+	}
+	mean /= float64(len(s))
+	return math.Sqrt(mean)
 }
