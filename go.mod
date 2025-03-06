@@ -5,13 +5,14 @@ go 1.23.4
 require (
 	github.com/arthurkushman/go-hungarian v0.0.0-20210331201642-2b0c3bc2fb3f
 	github.com/hybridgroup/mjpeg v0.0.0-20140228234708-4680f319790e
-	github.com/lmittmann/tint v1.0.6
+	github.com/ivanlebron/mjpeg-go v0.0.0-20230313091709-a9c60d8a6b2b
+	github.com/lmittmann/tint v1.0.7
 	github.com/muesli/gamut v0.3.1
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/soypat/natiu-mqtt v0.6.0
 	gocv.io/x/gocv v0.40.0
-	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
-	golang.org/x/sync v0.10.0
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
+	golang.org/x/sync v0.12.0
 	gonum.org/v1/gonum v0.15.1
 )
 

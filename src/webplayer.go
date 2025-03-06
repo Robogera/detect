@@ -16,7 +16,8 @@ import (
 	"gocv.io/x/gocv"
 
 	// external
-	"github.com/hybridgroup/mjpeg"
+	// "github.com/hybridgroup/mjpeg"
+	"github.com/ivanlebron/mjpeg-go"
 )
 
 func webplayer(
@@ -34,7 +35,13 @@ func webplayer(
 
 	output_stream := mjpeg.NewStream()
 
-	http.Handle("/", output_stream)
+	http.HandleFunc("/mjpeg", output_stream.ServeHTTP)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<meta http-equiv="refresh" content="3" />`))
+		w.Write([]byte(`<img src="/mjpeg" style="width: 95%" />`))
+	})
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf("0.0.0.0:%d", cfg.Webserver.Port),
@@ -84,7 +91,7 @@ func webplayer(
 			}
 			data := make([]byte, buf.Len())
 			copy(data, buf.GetBytes()) // need to profile this and maybe not copy the entire frame every time
-			output_stream.UpdateJPEG(data)
+			output_stream.Update(data)
 			buf.Close()
 			frame.Value().Mat.Close()
 			select {
