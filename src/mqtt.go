@@ -22,7 +22,9 @@ func mqttclient(
 	cfg *config.ConfigFile,
 	in_chan <-chan indexed.Indexed[[]*person.ExportedPerson],
 ) error {
+
 	logger := parent_logger.With("coroutine", "mqttclient")
+
 	client := mqtt.NewClient(
 		mqtt.ClientConfig{
 			Decoder: mqtt.DecoderNoAlloc{UserBuffer: make([]byte, 2048)},
@@ -35,7 +37,7 @@ func mqttclient(
 				return nil
 			},
 		})
-    connection, err := net.Dial("tcp", cfg.Mqtt.Address+":"+fmt.Sprintf("%d", cfg.Mqtt.Port))
+	connection, err := net.Dial("tcp", cfg.Mqtt.Address+":"+fmt.Sprintf("%d", cfg.Mqtt.Port))
 	if err != nil {
 		logger.Error("TCP connection failed",
 			"host", cfg.Mqtt.Address, "port", cfg.Mqtt.Port, "error", err)
@@ -44,16 +46,16 @@ func mqttclient(
 
 	connection_ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
-  var username_bytes, password_bytes []byte
-  if cfg.Mqtt.Username != "" {
-    username_bytes = []byte(cfg.Mqtt.Username)
-  }
-  if cfg.Mqtt.Password != "" {
-    password_bytes = []byte(cfg.Mqtt.Password)
-  }
+	var username_bytes, password_bytes []byte
+	if cfg.Mqtt.Username != "" {
+		username_bytes = []byte(cfg.Mqtt.Username)
+	}
+	if cfg.Mqtt.Password != "" {
+		password_bytes = []byte(cfg.Mqtt.Password)
+	}
 	vars := &mqtt.VariablesConnect{
 		ClientID: []byte(cfg.Mqtt.ClientID),
-    Protocol: []byte("mqtt"),
+		Protocol: []byte("mqtt"),
 		Username: username_bytes,
 		Password: password_bytes,
 	}
@@ -73,11 +75,11 @@ func mqttclient(
 		logger.Error("MQTT publish flags configured incorrectly", "error", err)
 		return err
 	}
-	base_command := &synapse.Command{
+	base_event := &synapse.Event{
 		Sender:    cfg.Mqtt.ClientID,
-		Type:      "command",
+		Type:      cfg.Mqtt.Type,
 		Initiator: cfg.Mqtt.ClientID,
-		Subject:   "update",
+		Subject:   cfg.Mqtt.Subject,
 	}
 	base_vars := mqtt.VariablesPublish{
 		TopicName: []byte(cfg.Mqtt.TopicName),
@@ -88,10 +90,10 @@ func mqttclient(
 			logger.Info("Cancelled by context")
 			return context.Canceled
 		case frame := <-in_chan:
-			base_vars.PacketIdentifier = uint16(frame.Id()+1)
-			base_command.Message = &synapse.Message{People: frame.Value()}
-			base_command.Id = uint(frame.Id())
-			payload, err := base_command.ToPayload()
+			base_vars.PacketIdentifier = uint16(frame.Id() + 1)
+			base_event.Message = &synapse.Message{People: frame.Value()}
+			base_event.Id = uint(frame.Id())
+			payload, err := base_event.ToPayload()
 			if err != nil {
 				logger.Error("Can't marshal payload", "frame_id", frame.Id(), "message", frame.Value(), "error", err)
 				return err

@@ -6,7 +6,7 @@ import (
 	"github.com/Robogera/detect/pkg/person"
 )
 
-type Command struct {
+type Event struct {
 	Id        uint     `json:"id"`
 	Sender    string   `json:"sender"`
 	Type      string   `json:"type"`
@@ -19,6 +19,6 @@ type Message struct {
 	People []*person.ExportedPerson `json:"people"`
 }
 
-func (c *Command) ToPayload() ([]byte, error) {
+func (c *Event) ToPayload() ([]byte, error) {
 	return json.Marshal(c)
 }

@@ -86,6 +86,8 @@ type MqttConfig struct {
 	ClientID  string `toml:"client_id"`
 	Username  string `toml:"username"`
 	Password  string `toml:"password"`
+	Type      string `toml:"type"`
+	Subject   string `toml:"subject"`
 }
 
 type ReidConfig struct {
