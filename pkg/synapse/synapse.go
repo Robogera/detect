@@ -11,6 +11,7 @@ type Event struct {
 	Sender    string   `json:"sender"`
 	Type      string   `json:"type"`
 	Initiator string   `json:"initiator"`
+	Receiver  string   `json:"receiver"`
 	Message   *Message `json:"message"`
 }
 

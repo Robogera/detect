@@ -79,6 +79,7 @@ func mqttclient(
 		Sender:    cfg.Mqtt.ClientID,
 		Type:      cfg.Mqtt.Type,
 		Initiator: cfg.Mqtt.ClientID,
+		Receiver:  cfg.Mqtt.ClientID,
 	}
 	base_vars := mqtt.VariablesPublish{
 		TopicName: []byte(cfg.Mqtt.TopicName),
