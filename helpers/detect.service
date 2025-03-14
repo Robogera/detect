@@ -1,0 +1,15 @@
+[Unit]
+Description=Synapse server
+After=NetworkManager-wait-online.service network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Environment="LD_LIBRARY_PATH=/srv/ocs/install/lib"
+ExecStart=/srv/ocs/detect/bin/detect --config /srv/ocs/configs/config-right.toml
+WorkingDirectory=/srv/ocs
+Restart=always
+RestartSec=5
+User=ocs
+
+[Install]
+WantedBy=multi-user.target
