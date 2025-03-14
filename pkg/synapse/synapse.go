@@ -16,7 +16,7 @@ type Event struct {
 
 type Message struct {
 	Subject    string                   `json:"subject"`
-	Detections []*person.ExportedPerson `json:"people"`
+	Detections []*person.ExportedPerson `json:"detections"`
 }
 
 func (c *Event) ToPayload() ([]byte, error) {
