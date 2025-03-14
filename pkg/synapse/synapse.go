@@ -11,12 +11,12 @@ type Event struct {
 	Sender    string   `json:"sender"`
 	Type      string   `json:"type"`
 	Initiator string   `json:"initiator"`
-	Subject   string   `json:"subject"`
 	Message   *Message `json:"message"`
 }
 
 type Message struct {
-	People []*person.ExportedPerson `json:"people"`
+	Subject    string                   `json:"subject"`
+	Detections []*person.ExportedPerson `json:"people"`
 }
 
 func (c *Event) ToPayload() ([]byte, error) {
