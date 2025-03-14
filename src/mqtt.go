@@ -91,7 +91,7 @@ func mqttclient(
 			return context.Canceled
 		case frame := <-in_chan:
 			base_vars.PacketIdentifier = uint16(frame.Id() + 1)
-			base_event.Message = &synapse.Message{Detections: frame.Value(), Subject: cfg.Mqtt.Subject}
+			base_event.Message = &synapse.Message{Parameters: &synapse.Parameters{Detections: frame.Value()}, Subject: cfg.Mqtt.Subject}
 			base_event.Id = uint(frame.Id())
 			payload, err := base_event.ToPayload()
 			if err != nil {

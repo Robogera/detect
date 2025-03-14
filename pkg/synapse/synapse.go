@@ -16,7 +16,11 @@ type Event struct {
 }
 
 type Message struct {
-	Subject    string                   `json:"subject"`
+	Subject    string      `json:"subject"`
+	Parameters *Parameters `json:"parameters"`
+}
+
+type Parameters struct {
 	Detections []*person.ExportedPerson `json:"detections"`
 }
 
