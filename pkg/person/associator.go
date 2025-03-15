@@ -71,7 +71,6 @@ func (a *Associator) Associate(
 	m *gocv.Mat,
 	boxes []image.Rectangle,
 	t time.Time,
-	f func(score, dist float64) float64,
 ) {
 
 	size := m.Size()
@@ -124,7 +123,7 @@ func (a *Associator) Associate(
 			score := seq.SqrtMean(scores)
 			// punishing distant pairs with lower score
 			if overshoot := person.distance(detection.Box) - float64(a.cfg.Reid.DistanceThreshold); overshoot > 0 {
-				score /= overshoot * a.cfg.Reid.DistanceFactor
+				score = score * (1 - max(1, overshoot/100.0*a.cfg.Reid.DistanceFactor))
 			}
 			diss_mat.Set(pid, did, score)
 		}
@@ -161,7 +160,7 @@ func (a *Associator) Associate(
 func (a *Associator) CleanUp(t time.Time, bounds image.Rectangle) {
 	for _, person := range a.p {
 		if person.Status() == STATUS_EXPIRED {
-      a.del(person.id)
+			a.del(person.id)
 		} else {
 			since_update := person.SinceDetection(t)
 			if (!person.IsValid() && since_update > a.nonvalid_expiration_duration) ||

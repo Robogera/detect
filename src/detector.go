@@ -95,7 +95,9 @@ func detector(
 				Mat: frame.Value(),
 				Boxes: boxes,
 			}):
-			logger.Info("Detected", "boxes", boxes)
+				if len(boxes) > 0 {
+					logger.Info("Detected", "boxes", boxes)
+				}
 			case <-ctx.Done():
 				logger.Info("Cancelled by context")
 				return context.Canceled

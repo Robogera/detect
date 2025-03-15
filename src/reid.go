@@ -10,7 +10,6 @@ import (
 	"runtime"
 
 	"github.com/Robogera/detect/pkg/config"
-	"github.com/Robogera/detect/pkg/functions"
 	"github.com/Robogera/detect/pkg/indexed"
 	"github.com/Robogera/detect/pkg/person"
 	"gocv.io/x/gocv"
@@ -87,9 +86,6 @@ func reidentificator(
 			associator.CleanUp(frame.Time(), image.Rect(0, 0, dims[1], dims[0]))
 			associator.Associate(
 				frame.Value().Mat, frame.Value().Boxes, frame.Time(),
-				func(s, d float64) float64 {
-					return functions.Gaussian(s, d, cfg.Reid.DistanceFactor)
-				},
 			)
 			people := associator.EnumeratePeople()
 			status := make(map[string]string, len(people))
@@ -103,7 +99,9 @@ func reidentificator(
 				person.DrawBox(frame.Value().Mat, 1)
 				// person.DrawTrajectory(frame.Value().Mat, 1, alpha)
 			}
-			logger.Info("People", "status", status)
+			if len(status) > 0 {
+				logger.Info("People", "status", status)
+			}
 			select {
 			case <-ctx.Done():
 				logger.Info("Streamreader cancelled by context")
